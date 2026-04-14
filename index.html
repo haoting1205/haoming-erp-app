@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1E1E1C">
+<title>好洺餐飲 — 門市 APP</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoi5aW95rSy6aSQ6aOyIEFQUCIsInNob3J0X25hbWUiOiLlpb3mtLIiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFFMUUxQyIsInRoZW1lX2NvbG9yIjoiIzFFMUUxQyJ9">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--pri:#0A5A46;--pri-l:#DFF5EC;--amber:#9A6210;--amber-l:#FFF4E0;--red:#B82525;--red-l:#FDE8E8;--bg:#F3F1EB;--card:#fff;--txt:#1E1E1C;--txt2:#555350;--txt3:#706E68;--brd:#D6D4CC;--r:12px}
+html{font-size:16px}
+body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;min-height:100dvh;padding-bottom:env(safe-area-inset-bottom,0);display:flex;flex-direction:column}
+.header{background:#1E1E1C;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.header-dot{width:8px;height:8px;background:#D4950F;border-radius:50%}
+.header-right{font-size:0.78rem;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:8px}
+.header-right button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer;font-family:inherit}
+.content{flex:1;padding:12px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tab-bar{background:#fff;border-top:1px solid var(--brd);display:grid;grid-template-columns:repeat(5,1fr);position:sticky;bottom:0;z-index:100;padding-bottom:env(safe-area-inset-bottom,0)}
+.tab-item{display:flex;flex-direction:column;align-items:center;padding:8px 0 6px;cursor:pointer;font-size:0.68rem;color:var(--txt3);border:none;background:none;font-family:inherit;transition:.15s}
+.tab-item.active{color:var(--amber);font-weight:700}
+.tab-icon{font-size:1.3rem;margin-bottom:2px}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.card-title{font-size:0.88rem;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:1.5px solid #ECEAE4}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.metric{background:var(--bg);border-radius:8px;padding:10px 12px;text-align:center}
+.metric-label{font-size:0.72rem;color:var(--txt3);margin-bottom:3px}
+.metric-val{font-size:1.3rem;font-weight:700}
+.btn{border:none;border-radius:8px;padding:10px 16px;font-size:0.92rem;cursor:pointer;font-family:inherit;font-weight:600;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.btn-pri{background:var(--pri);color:#fff}.btn-pri:active{background:#064535}
+.btn-out{background:#fff;border:1.5px solid var(--brd);color:var(--txt)}.btn-out:active{background:var(--bg)}
+.btn-sm{padding:7px 12px;font-size:0.84rem;width:auto}
+.btn-danger{background:var(--red);color:#fff}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #ECEAE4}
+.list-item:last-child{border-bottom:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:600}
+.badge-ok{background:var(--pri-l);color:var(--pri)}.badge-warn{background:var(--amber-l);color:var(--amber)}.badge-err{background:var(--red-l);color:var(--red)}.badge-blue{background:#E6F1FB;color:#0C447C}
+.fg{margin-bottom:10px}
+.fg label{font-size:0.82rem;color:var(--txt2);font-weight:600;display:block;margin-bottom:4px}
+.fg input,.fg select{width:100%;border:1.5px solid var(--brd);border-radius:8px;padding:10px 12px;font-size:0.95rem;font-family:inherit;background:var(--bg);color:var(--txt);outline:none;-webkit-appearance:none}
+.fg input:focus,.fg select:focus{border-color:var(--pri);background:#fff}
+.empty{text-align:center;color:var(--txt3);padding:32px 0;font-size:0.92rem}
+.ord-sticky{position:sticky;bottom:60px;background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:10px 14px;z-index:10}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1E1E1C;color:#fff;padding:8px 20px;border-radius:20px;font-size:0.88rem;font-weight:600;opacity:0;transition:opacity .3s;z-index:999;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal-box{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0))}
+.modal-title{font-size:1rem;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1.5px solid #ECEAE4;display:flex;justify-content:space-between;align-items:center}
+.alert-item{padding:10px 12px;border-radius:8px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.alert-danger{background:var(--red-l);border-left:3px solid var(--red)}
+.alert-warn{background:var(--amber-l);border-left:3px solid var(--amber)}
+.alert-info{background:#E6F1FB;border-left:3px solid #1455A0}
+
+/* Login */
+.login-wrap{position:fixed;inset:0;background:#1E1E1C;z-index:9999;display:flex;align-items:center;justify-content:center}
+.login-box{background:#fff;border-radius:16px;padding:28px 24px;width:340px;max-width:90vw}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title"><span class="header-dot"></span>好洺門市 APP</div>
+  <div class="header-right" id="hdr-right"></div>
+</div>
+
+<div class="content" id="app-content"></div>
+
+<div class="tab-bar" id="tab-bar">
+  <button class="tab-item active" data-tab="home" onclick="switchTab('home')"><span class="tab-icon">🏠</span>首頁</button>
+  <button class="tab-item" data-tab="stock" onclick="switchTab('stock')"><span class="tab-icon">📦</span>庫存</button>
+  <button class="tab-item" data-tab="order" onclick="switchTab('order')"><span class="tab-icon">📋</span>叫貨</button>
+  <button class="tab-item" data-tab="check" onclick="switchTab('check')"><span class="tab-icon">✅</span>檢查</button>
+  <button class="tab-item" data-tab="more" onclick="switchTab('more')"><span class="tab-icon">⚙️</span>更多</button>
+</div>
+
+<div class="toast" id="app-toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-database-compat.min.js"></script>
+<script>
+// ── State ──
+var APP_KEY='hm_app_v1';
+var FIREBASE_CONFIG={
+  apiKey:"AIzaSyDczQa3QfksohoIqf2-rW9OfYCIJXASNq4",
+  authDomain:"haoming-erp.firebaseapp.com",
+  databaseURL:"https://haoming-erp-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"haoming-erp",
+  storageBucket:"haoming-erp.firebasestorage.app",
+  messagingSenderId:"873400453045",
+  appId:"1:873400453045:web:140d7092ba8e61ce80fbfc"
+};
+var FIREBASE_URL=FIREBASE_CONFIG.databaseURL;
+var app={store:'',user:'',role:'',firebaseUrl:FIREBASE_URL,lastSync:'',data:null};
+try{var saved=JSON.parse(localStorage.getItem(APP_KEY)||'{}');if(saved.store)Object.assign(app,saved)}catch(e){}
+
+var currentTab='home';
+
+function saveApp(){try{localStorage.setItem(APP_KEY,JSON.stringify(app))}catch(e){}}
+function showToast(msg){var t=document.getElementById('app-toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2200)}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmt(n,d){return(n==null||isNaN(n))?'—':Number(n).toFixed(d||0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+function toDay(){return new Date().toISOString().slice(0,10)}
+
+// ── Firebase Sync ──
+var _appFb=null;var _appDb=null;
+function initAppFirebase(){
+  if(_appDb)return true;
+  try{
+    if(!firebase.apps.length){_appFb=firebase.initializeApp(FIREBASE_CONFIG)}else{_appFb=firebase.apps[0]}
+    _appDb=firebase.database();return true;
+  }catch(e){console.error('Firebase init:',e);return false}
+}
+
+function cloudPull(cb){
+  if(!initAppFirebase()){if(cb)cb(false);return}
+  _appDb.ref('erp_data').once('value')
+    .then(function(snap){
+      var res=snap.val();
+      if(res&&res.data){app.data=res.data;app.lastSync=new Date().toISOString();saveApp();if(cb)cb(true)}
+      else{if(cb)cb(false)}
+    }).catch(function(){if(cb)cb(false)});
+}
+
+function cloudPush(){
+  if(!initAppFirebase()||!app.data)return;
+  var payload={data:app.data,updated_at:new Date().toISOString(),device:'APP-'+(app.store||'mobile')};
+  _appDb.ref('erp_data').set(payload)
+    .then(function(){app.lastSync=new Date().toISOString();saveApp();showToast('✅ 已同步')})
+    .catch(function(){showToast('❌ 同步失敗')});
+}
+
+// ── Login ──
+function checkLogin(){
+  if(app.store&&app.firebaseUrl){updateHeader();return true}
+  showSetup();return false;
+}
+
+function showSetup(){
+  document.getElementById('tab-bar').style.display='none';
+  var c=document.getElementById('app-content');
+  c.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:70vh"><div class="login-box" style="background:var(--card)">'+
+    '<div style="text-align:center;margin-bottom:20px"><div style="width:40px;height:40px;background:#D4950F;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.1rem">好</div><div style="font-weight:700;font-size:1.05rem">好洺門市 APP</div><div style="font-size:0.82rem;color:var(--txt3);margin-top:4px">連接主系統使用</div></div>'+
+    '<div class="fg"><label>選擇門市</label><select id="s-store"><option value="">— 請選擇 —</option><option value="交大店">交大店</option><option value="竹北店">竹北店</option><option value="台積電店">台積電店</option><option value="中央廚房">中央廚房</option></select></div>'+
+    '<div class="fg"><label>你的名字</label><input id="s-user" value="'+esc(app.user||'')+'" placeholder="輸入姓名"></div>'+
+    '<button class="btn btn-pri" onclick="doSetup()" style="margin-top:6px">開始使用</button>'+
+    '<div style="text-align:center;margin-top:14px;font-size:0.78rem;color:var(--txt3)">選擇門市並輸入姓名即可開始</div>'+
+    '</div></div>';
+}
+
+function doSetup(){
+  var store=(document.getElementById('s-store')||{}).value||'';
+  var user=(document.getElementById('s-user')||{}).value||'';
+  if(!store){showToast('請選擇門市');return}
+  if(!user){showToast('請輸入姓名');return}
+  app.firebaseUrl=FIREBASE_URL;
+  app.store=store;app.user=user;app.role='員工';
+  saveApp();
+  showToast('🔄 正在同步...');
+  cloudPull(function(ok){
+    if(ok){document.getElementById('tab-bar').style.display='';switchTab('home');showToast('✅ 連線成功')}
+    else{showToast('❌ 連線失敗，請檢查 URL')}
+  });
+}
+
+// ── Header ──
+function updateHeader(){
+  var h=document.getElementById('hdr-right');
+  h.innerHTML='<span>'+esc(app.store)+'</span><button onclick="cloudPull(function(ok){if(ok){switchTab(currentTab);showToast(\'✅ 已同步\')}else{showToast(\'❌ 同步失敗\')}})">🔄</button>';
+}
+
+// ── Tab Navigation ──
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-item').forEach(function(t){t.classList.toggle('active',t.dataset.tab===tab)});
+  var c=document.getElementById('app-content');
+  var d=app.data||{};
+  if(tab==='home')renderHome(c,d);
+  else if(tab==='stock')renderStock(c,d);
+  else if(tab==='order')renderOrder(c,d);
+  else if(tab==='check')renderCheck(c,d);
+  else if(tab==='more')renderMore(c,d);
+}
+
+// ── 🏠 Home ──
+function renderHome(c,d){
+  var ings=d.ings||[];var si=d.storeInv||[];
+  var myInv=si.filter(function(i){return i.store===app.store});
+  var lowStock=myInv.filter(function(i){return i.stock>0&&i.stock<=i.safety}).length;
+  var outStock=myInv.filter(function(i){return i.stock<=0}).length;
+  var batches=d.batchList||[];
+  var today=toDay();
+  var expiring=batches.filter(function(b){if(b.status==='已用完'||!b.expiryDate)return false;var days=Math.ceil((new Date(b.expiryDate)-new Date(today))/86400000);return days>=0&&days<=3&&(b.store===app.store||b.store==='中央廚房')}).length;
+  var expired=batches.filter(function(b){return b.status!=='已用完'&&b.expiryDate&&b.expiryDate<today&&(b.store===app.store||b.store==='中央廚房')}).length;
+  
+  var alerts=[];
+  if(outStock)alerts.push({type:'danger',msg:outStock+' 項缺貨',icon:'❌'});
+  if(expired)alerts.push({type:'danger',msg:expired+' 批已過期',icon:'🚫'});
+  if(lowStock)alerts.push({type:'warn',msg:lowStock+' 項低庫存',icon:'⚠️'});
+  if(expiring)alerts.push({type:'warn',msg:expiring+' 批 3天內到期',icon:'⏰'});
+  var pending=(d.poList||[]).filter(function(p){return p.status==='申請中'}).length;
+  if(pending)alerts.push({type:'info',msg:pending+' 筆採購待核准',icon:'📋'});
+  
+  var html='<div style="margin-bottom:10px;font-size:1.1rem;font-weight:700">👋 '+esc(app.user||'你好')+'，'+esc(app.store)+'</div>';
+  html+='<div class="metric-grid"><div class="metric"><div class="metric-label">門市庫存品項</div><div class="metric-val">'+myInv.length+'</div></div><div class="metric"><div class="metric-label">需注意</div><div class="metric-val" style="color:'+(alerts.length?'var(--red)':'var(--pri)')+'">'+alerts.length+'</div></div></div>';
+  
+  if(alerts.length){html+='<div class="card"><div class="card-title">🔔 待處理事項</div>';alerts.forEach(function(a){html+='<div class="alert-item alert-'+a.type+'"><span style="font-size:1.1rem">'+a.icon+'</span><span style="font-weight:600;font-size:0.88rem">'+a.msg+'</span></div>'});html+='</div>'}
+  else{html+='<div class="card" style="text-align:center;padding:24px;color:var(--pri)"><div style="font-size:1.5rem;margin-bottom:6px">✅</div>一切正常！</div>'}
+  
+  html+='<div class="card"><div class="card-title">⚡ 快速操作</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn btn-out" onclick="switchTab(\'stock\')">📦 查庫存</button><button class="btn btn-out" onclick="switchTab(\'order\')">📋 叫貨</button><button class="btn btn-out" onclick="switchTab(\'check\')">✅ 檢查</button><button class="btn btn-out" onclick="quickAdjust()">📝 盤點</button></div></div>';
+  
+  html+='<div style="text-align:center;font-size:0.72rem;color:var(--txt3);margin-top:8px">最後同步：'+(app.lastSync?(app.lastSync.slice(0,19).replace('T',' ')):'尚未同步')+'</div>';
+  c.innerHTML=html;
+}
+
+// ── 📦 Stock ──
+function renderStock(c,d){
+  var si=d.storeInv||[];
+  var myInv=si.filter(function(i){return i.store===app.store});
+  var html='<div class="fg"><input id="stk-q" placeholder="🔍 搜尋品名..." oninput="filterStock()"></div>';
+  html+='<div id="stk-list">';
+  html+=buildStockList(myInv,'');
+  html+='</div>';
+  c.innerHTML=html;
+}
+
+function buildStockList(items,q){
+  var filtered=q?items.filter(function(i){return i.name.includes(q)}):items;
+  if(!filtered.length)return'<div class="empty">無庫存品項</div>';
+  var html='';
+  filtered.forEach(function(i){
+    var statusBadge=i.stock<=0?'<span class="badge badge-err">缺貨</span>':i.stock<=i.safety?'<span class="badge badge-warn">低庫存</span>':'<span class="badge badge-ok">充足</span>';
+    var catBadge=i.cat==='食材'?'<span class="badge badge-ok">食材</span>':'<span class="badge badge-blue">包材</span>';
+    html+='<div class="card" style="padding:10px 14px" onclick="showStockDetail(\''+i.id+'\')"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700;font-size:0.95rem">'+esc(i.name)+'</div><div style="font-size:0.78rem;color:var(--txt3);margin-top:3px">'+catBadge+' '+statusBadge+'</div></div><div style="text-align:right"><div style="font-size:1.2rem;font-weight:700">'+fmt(i.stock,1)+'</div><div style="font-size:0.72rem;color:var(--txt3)">'+esc(i.unit)+' / 安全:'+fmt(i.safety,0)+'</div></div></div></div>';
+  });
+  return html;
+}
+
+window.filterStock=function(){
+  var q=(document.getElementById('stk-q')||{}).value||'';
+  var si=(app.data||{}).storeInv||[];
+  var myInv=si.filter(function(i){return i.store===app.store});
+  document.getElementById('stk-list').innerHTML=buildStockList(myInv,q);
+};
+
+window.showStockDetail=function(id){
+  var si=(app.data||{}).storeInv||[];
+  var item=si.find(function(i){return i.id===id});
+  if(!item)return;
+  showModal('<div class="modal-title"><span>'+esc(item.name)+'</span><button class="btn btn-sm btn-out" onclick="closeModal()">✕</button></div>'+
+    '<div class="metric-grid"><div class="metric"><div class="metric-label">現有庫存</div><div class="metric-val">'+fmt(item.stock,1)+'</div><div style="font-size:0.72rem;color:var(--txt3)">'+esc(item.unit)+'</div></div><div class="metric"><div class="metric-label">安全庫存</div><div class="metric-val">'+fmt(item.safety,0)+'</div></div></div>'+
+    '<div style="font-size:0.84rem;color:var(--txt2);line-height:1.8;margin-bottom:14px">類別：'+(item.cat==='食材'?'🥬 食材':'📦 包材')+'<br>來源：'+esc(item.sourceType||'—')+'<br>供應商：'+esc(item.supplier||'—')+'<br>進價：NT$'+fmt(item.price,2)+'</div>'+
+    '<div class="fg"><label>庫存調整</label><div style="display:flex;gap:6px"><select id="adj-type" style="flex:1"><option value="set">設為</option><option value="add">增加</option><option value="sub">減少</option></select><input id="adj-qty" type="number" min="0" step="0.1" placeholder="數量" style="flex:1"></div></div>'+
+    '<button class="btn btn-pri" onclick="doAdjust(\''+id+'\')">確認調整並同步</button>');
+};
+
+window.doAdjust=function(id){
+  var si=(app.data||{}).storeInv||[];
+  var item=si.find(function(i){return i.id===id});
+  if(!item)return;
+  var type=(document.getElementById('adj-type')||{}).value||'set';
+  var qty=parseFloat((document.getElementById('adj-qty')||{}).value)||0;
+  if(type==='set')item.stock=qty;
+  else if(type==='add')item.stock=(item.stock||0)+qty;
+  else item.stock=Math.max(0,(item.stock||0)-qty);
+  item.updatedAt=toDay();
+  closeModal();
+  cloudPush();
+  switchTab('stock');
+  showToast('✅ 庫存已更新');
+};
+
+// ── 📋 Order (完整叫貨表 231 項) ──
+var SHEETS=[{"id": "yi_food_order", "title": "義早食材叫貨", "formNo": "表格編號：1140401", "items": [{"seq": 1, "name": "紐澳良雞腿排(4支/包)", "unit": "包", "price": 200}, {"seq": 2, "name": "蒜香雞肉(1kg/包)", "unit": "包", "price": 210}, {"seq": 3, "name": "綜合鮮菇(1kg/包)", "unit": "包", "price": 180}, {"seq": 4, "name": "炭香燒肉(1kg/包)", "unit": "包", "price": 260}, {"seq": 5, "name": "鮪魚醬(1kg/包)", "unit": "包", "price": 290}, {"seq": 6, "name": "凱撒醬(1kg/包)", "unit": "包", "price": 275}, {"seq": 7, "name": "蜂蜜芥末醬(1kg/包)", "unit": "包", "price": 180}, {"seq": 8, "name": "塔塔醬(1kg/包)", "unit": "包", "price": 180}, {"seq": 9, "name": "藍莓優格醬(1kg/包)", "unit": "包", "price": 270}, {"seq": 10, "name": "大蒜醬(500g/盒)", "unit": "盒", "price": 230}, {"seq": 11, "name": "杏仁奶酥醬(500g/盒)", "unit": "盒", "price": 245}, {"seq": 12, "name": "紅醬(1kg/包)", "unit": "包", "price": 160}, {"seq": 13, "name": "白醬(1kg/包)", "unit": "包", "price": 160}, {"seq": 14, "name": "青醬(1kg/包)", "unit": "包", "price": 210}, {"seq": 15, "name": "肉醬(1kg/包)", "unit": "包", "price": 180}, {"seq": 16, "name": "泰式打拋豬(1kg/包)", "unit": "包", "price": 195}, {"seq": 17, "name": "麻辣醬(1kg/包)", "unit": "包", "price": 270}, {"seq": 18, "name": "辣椒醬(500g/包)", "unit": "包", "price": 140}, {"seq": 19, "name": "醬油膏(1kg/包)", "unit": "包", "price": 95}, {"seq": 20, "name": "料理調味粉(1kg/包)", "unit": "包", "price": 130}, {"seq": 21, "name": "義大利直麵(熟)(200g/包)", "unit": "包", "price": 10}, {"seq": 22, "name": "蜜汁鴨胸(500g/23包/箱)", "unit": "包", "price": 315}, {"seq": 23, "name": "青花菜(1kg/10包/箱)", "unit": "包", "price": 70}, {"seq": 24, "name": "玉米筍(1kg/10包/箱)", "unit": "包", "price": 126}, {"seq": 25, "name": "紅蘿蔔片(1kg/10包/箱)", "unit": "包", "price": 58}, {"seq": 26, "name": "大魚排(60片/箱)(5片為單位)", "unit": "包", "price": 75}, {"seq": 27, "name": "日式雪花豬排(130g/45片/6kg箱)(5片為單位)", "unit": "包", "price": 175}, {"seq": 28, "name": "鯰魚排(5片/10包/箱)", "unit": "包", "price": 179}, {"seq": 29, "name": "鯰魚排(3片/10包/箱)", "unit": "包", "price": 95}, {"seq": 30, "name": "韓式泡菜(3kg/桶)", "unit": "包", "price": 480}, {"seq": 31, "name": "優質雞塊(1kg/12包)", "unit": "包", "price": 142}, {"seq": 32, "name": "紅皮熟栗地瓜(1kg/12包/箱)", "unit": "包", "price": 116}, {"seq": 33, "name": "玉米粒易開罐(285g/24罐/箱)", "unit": "罐", "price": 22}, {"seq": 34, "name": "義大利直麵(生)(500g/20包/箱)", "unit": "包", "price": 26}, {"seq": 35, "name": "鮮奶油23.3%(12罐/箱)", "unit": "罐", "price": 105}, {"seq": 36, "name": "原味乳酪醬(500g/盒)", "unit": "盒", "price": 194}, {"seq": 37, "name": "藍莓乳酪醬(500g/盒)", "unit": "盒", "price": 200}, {"seq": 38, "name": "青蘋果餡(2.7g/6罐/箱)", "unit": "罐", "price": 683}, {"seq": 39, "name": "美乃滋(600g/包)", "unit": "包", "price": 76}, {"seq": 40, "name": "美式鬆餅(2片/50包/箱)", "unit": "包", "price": 12}, {"seq": 41, "name": "乳酪燒餅(10片/3盒/箱)", "unit": "箱", "price": 320}, {"seq": 42, "name": "光頭堡(30顆/籃)", "unit": "顆", "price": 7}, {"seq": 43, "name": "帕尼尼(30顆/籃)", "unit": "顆", "price": 13}, {"seq": 44, "name": "帕瑪森熱狗堡(12入/包)", "unit": "包", "price": 164}, {"seq": 45, "name": "泰式紅茶葉(600g*/30包/箱)", "unit": "包", "price": 157}, {"seq": 46, "name": "奶香金萱(600g/30包/箱)", "unit": "包", "price": 224}, {"seq": 47, "name": "白葡萄風味烏龍茶包(6.5g*50入/20包/箱)", "unit": "包", "price": 242}, {"seq": 48, "name": "南非國寶茶(7g*50入/20包/箱)", "unit": "包", "price": 453}, {"seq": 49, "name": "南非綠國寶茶(3.5g*50入/20包/箱)", "unit": "包", "price": 389}, {"seq": 50, "name": "南非紫蘇綠國寶茶(4.5g*50入/20包/箱)", "unit": "包", "price": 389}, {"seq": 51, "name": "專用奶精粉(1kg/20包/箱)", "unit": "包", "price": 173}, {"seq": 52, "name": "什穀芝麻飲粉(500g/40包/箱)", "unit": "包", "price": 168}, {"seq": 53, "name": "比利時風味巧克力粉(1kg/20包/箱)", "unit": "包", "price": 420}]}, {"id": "yi_pack_order", "title": "義早包材叫貨", "formNo": "表格編號：1150325", "items": [{"seq": 1, "name": "PET8OZ透明沙拉碗(25個/20包/箱)", "unit": "包", "price": 44}, {"seq": 2, "name": "PET8OZ透明沙拉蓋(50個/10包/箱)", "unit": "包", "price": 53}, {"seq": 3, "name": "PET24OZ花型沙拉碗、蓋(50個/3組/箱)", "unit": "組", "price": 273}, {"seq": 4, "name": "500空白紙杯(50個/20包/箱)", "unit": "包", "price": 60}, {"seq": 5, "name": "400空白紙杯(50個/20包/箱)", "unit": "包", "price": 55}, {"seq": 6, "name": "360空白紙杯(50個/20包/箱)", "unit": "包", "price": 53}, {"seq": 7, "name": "8OZ空白紙杯(50個/20包/箱)", "unit": "包", "price": 54}, {"seq": 8, "name": "凸杯蓋 90mm(50個/20包/箱)", "unit": "包", "price": 49}, {"seq": 9, "name": "凸杯蓋 78mm(50個/20包/箱)", "unit": "包", "price": 57}, {"seq": 10, "name": "90熱杯套(25個/40包/箱)", "unit": "串", "price": 20}, {"seq": 11, "name": "1.5OZ PET塑膠杯蓋(100個/25包/箱)", "unit": "包", "price": 92}, {"seq": 12, "name": "902塑膠內襯(50個/12包/箱)", "unit": "包", "price": 63}, {"seq": 13, "name": "902空白紙湯碗(50個/12包/箱)", "unit": "包", "price": 81}, {"seq": 14, "name": "902凸蓋(50個/12包/箱)", "unit": "包", "price": 66}, {"seq": 15, "name": "850透明塑膠湯碗(50個/12包/箱)", "unit": "包", "price": 103}, {"seq": 16, "name": "850空白紙湯碗(50個/12包/箱)", "unit": "包", "price": 60}, {"seq": 17, "name": "850平蓋(50個/12包/箱)", "unit": "包", "price": 29}, {"seq": 18, "name": "L300(50個/10包/箱)", "unit": "包", "price": 276}, {"seq": 19, "name": "L500(50個/10包/箱)", "unit": "包", "price": 171}, {"seq": 20, "name": "9吋披薩盒(50個/箱)", "unit": "箱", "price": 630}, {"seq": 21, "name": "3號內折牛皮方形餐盒(50個/4包/箱)", "unit": "包", "price": 315}, {"seq": 22, "name": "空白一體小(60個/10包/箱)", "unit": "包", "price": 83}, {"seq": 23, "name": "空白點心盒(100個/10包/箱)", "unit": "包", "price": 95}, {"seq": 24, "name": "20*20CM防油牛皮L袋(100個/40包/箱)", "unit": "包", "price": 88}, {"seq": 25, "name": "#70平口金色三角袋(100只/包)", "unit": "包", "price": 91}, {"seq": 26, "name": "鐵炮竹竹籤9cm(250支/80包)", "unit": "包", "price": 58}, {"seq": 27, "name": "黑色西餐匙(100支/40包/箱)", "unit": "包", "price": 46}, {"seq": 28, "name": "黑色西餐叉(100支/30包/2箱)", "unit": "包", "price": 45}, {"seq": 29, "name": "單支膠裝斜口6*18透明吸管(200支/20包/箱)", "unit": "包", "price": 26}, {"seq": 30, "name": "單支膠裝斜口12*21透明吸管(50支/40包/箱)", "unit": "包", "price": 14}, {"seq": 31, "name": "單支紙包斜口6*21透明吸管(100支/40包/箱)", "unit": "包", "price": 40}, {"seq": 32, "name": "單支紙包斜口6*21透明吸管(100支/50包/箱)", "unit": "包", "price": 46}, {"seq": 33, "name": "單支紙包斜口12*21透明吸管(50支/40包/箱)", "unit": "包", "price": 47}, {"seq": 34, "name": "免洗筷(80雙/30包/袋)", "unit": "包", "price": 21}, {"seq": 35, "name": "環保餐巾紙23cm單層(100張/60包/箱)", "unit": "包", "price": 22}, {"seq": 36, "name": "平邊牛皮色-四折扇形紙(100張/100包/箱)", "unit": "包", "price": 16}, {"seq": 37, "name": "空白封口膜(350m/6捲/箱)", "unit": "捲", "price": 352}, {"seq": 38, "name": "感熱紙80*80mm(60捲/箱)", "unit": "捲", "price": 22}, {"seq": 39, "name": "標籤貼紙40*30mm(5捲/20包/箱)", "unit": "包", "price": 139}, {"seq": 40, "name": "保鮮膜30公分 X 500公尺", "unit": "盒", "price": 399}, {"seq": 41, "name": "透明1號提袋(1kg/包)", "unit": "包", "price": 120}, {"seq": 42, "name": "透明2號提袋(1kg/包)", "unit": "包", "price": 120}, {"seq": 43, "name": "透明3號提袋(1kg/包)", "unit": "包", "price": 120}, {"seq": 44, "name": "透明1號提袋(2kg/包)", "unit": "包", "price": 240}, {"seq": 45, "name": "透明2號提袋(2kg/包)", "unit": "包", "price": 240}, {"seq": 46, "name": "透明3號提袋(2kg/包)", "unit": "包", "price": 240}, {"seq": 47, "name": "PS黑色雙杯座(100個/20包/箱)", "unit": "包", "price": 56}, {"seq": 48, "name": "PS黑色四杯座(50個/20包/箱)", "unit": "包", "price": 49}, {"seq": 49, "name": "煎板清潔劑", "unit": "瓶", "price": 303}, {"seq": 50, "name": "塑膠垃圾袋66*80(10包/箱)", "unit": "包", "price": 97}, {"seq": 51, "name": "義早logo圓貼(5000張)(約1~4天)", "unit": "包", "price": 1380}, {"seq": 52, "name": "收入傳票", "unit": "本", "price": 25}, {"seq": 53, "name": "支出傳票", "unit": "本", "price": 25}, {"seq": 54, "name": "二聯收據(50組/本)", "unit": "本", "price": 35}, {"seq": 55, "name": "透明膠帶18mm(8入/捆)", "unit": "捆", "price": 95}, {"seq": 56, "name": "BUNN12.75*5.25濾紙(500pcs/箱)", "unit": "箱", "price": 1102.5}, {"seq": 57, "name": "NBR無粉手套紫S號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 58, "name": "NBR無粉手套紫M號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 59, "name": "NBR無粉手套紫L號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 60, "name": "NBR無粉手套紫XL號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 61, "name": "立領長袖反摺-淺灰襯衫(M) 義早", "unit": "件", "price": 700}, {"seq": 62, "name": "立領長袖反摺-淺灰襯衫(L) 義早", "unit": "件", "price": 700}, {"seq": 63, "name": "立領長袖反摺-淺灰襯衫(XL) 義早", "unit": "件", "price": 700}, {"seq": 64, "name": "立領長袖反摺-淺灰襯衫(2L) 義早", "unit": "件", "price": 700}, {"seq": 65, "name": "立領長袖反摺-淺灰襯衫(3L) 義早", "unit": "件", "price": 700}, {"seq": 66, "name": "雙肩銅鈎耐磨咖啡色背心圍裙", "unit": "件", "price": 600}, {"seq": 67, "name": "深麻灰打鳥帽 義早", "unit": "件", "price": 200}]}, {"id": "gu_food_order", "title": "咕咕食材叫貨", "formNo": "表格編號：1140622", "items": [{"seq": 1, "name": "蒜香雞肉(1kg/包)", "unit": "包", "price": 210}, {"seq": 2, "name": "綜合鮮菇(1kg/包)", "unit": "包", "price": 180}, {"seq": 3, "name": "炭香燒肉(1kg/包)", "unit": "包", "price": 260}, {"seq": 4, "name": "鮪魚醬(1kg/包)", "unit": "包", "price": 290}, {"seq": 5, "name": "肉醬(1kg/包)", "unit": "包", "price": 180}, {"seq": 6, "name": "泰式打拋豬(1kg/包)", "unit": "包", "price": 195}, {"seq": 7, "name": "辣椒醬(500g/包)", "unit": "包", "price": 140}, {"seq": 8, "name": "醬油膏(1kg/包)", "unit": "包", "price": 95}, {"seq": 9, "name": "酸菜(1kg/包)", "unit": "包", "price": 110}, {"seq": 10, "name": "菜脯(1kg/包)", "unit": "包", "price": 90}, {"seq": 11, "name": "焢肉(1kg/包)", "unit": "包", "price": 185}, {"seq": 12, "name": "料理調味粉(1kg/包)", "unit": "包", "price": 130}, {"seq": 13, "name": "小熱狗(50支/20包/箱)", "unit": "包", "price": 120}, {"seq": 14, "name": "起司片(90片/12包)", "unit": "包", "price": 265}, {"seq": 15, "name": "乳酪絲(1kg/10包/箱)", "unit": "包", "price": 245}, {"seq": 16, "name": "薯餅(20片/12包/箱)", "unit": "包", "price": 150}, {"seq": 17, "name": "脆皮薯條(2kg/6包/箱)", "unit": "包", "price": 210}, {"seq": 18, "name": "鮮奶油23.3%(12罐/箱)", "unit": "罐", "price": 105}, {"seq": 19, "name": "美乃滋(600g/包)", "unit": "包", "price": 76}, {"seq": 20, "name": "老麵饅頭(6入/包)", "unit": "包", "price": 78}, {"seq": 21, "name": "黑糖饅頭(6入/包)", "unit": "包", "price": 92}, {"seq": 22, "name": "蔥捲(6入/包)", "unit": "包", "price": 135}, {"seq": 23, "name": "芋頭捲(6入/包)", "unit": "包", "price": 143}, {"seq": 24, "name": "雜糧堅果饅頭(6入/包)", "unit": "包", "price": 168}, {"seq": 25, "name": "鮮蔥黑豚包(6入/包)", "unit": "包", "price": 152}, {"seq": 26, "name": "金沙包(6入/包)", "unit": "包", "price": 152}, {"seq": 27, "name": "芝麻包(6入/包)", "unit": "包", "price": 143}, {"seq": 28, "name": "刈包(20入/8包/箱)", "unit": "包", "price": 150}, {"seq": 29, "name": "蛋餅皮(30片/12包/箱)", "unit": "包", "price": 65}, {"seq": 30, "name": "厚切蔥抓餅(10片/10包/箱)", "unit": "包", "price": 90}, {"seq": 31, "name": "河粉皮(10片/10包/箱)", "unit": "包", "price": 50}, {"seq": 32, "name": "乳酪燒餅(10片/3盒/箱)", "unit": "箱", "price": 320}, {"seq": 33, "name": "蘿蔔糕(10片/10包/箱)", "unit": "包", "price": 60}, {"seq": 34, "name": "鍋貼(50入/12包/箱)", "unit": "包", "price": 100}, {"seq": 35, "name": "生煎包(50入/12包/箱)", "unit": "包", "price": 100}, {"seq": 36, "name": "肉粽(10入/12包/箱)", "unit": "包", "price": 250}, {"seq": 37, "name": "老油條(300入/3kg/箱)", "unit": "箱", "price": 650}, {"seq": 38, "name": "肉鬆(3kg/桶)", "unit": "包", "price": 400}, {"seq": 39, "name": "優質雞塊(1kg/12包/箱)", "unit": "包", "price": 142}, {"seq": 40, "name": "黃金脆皮雞排(30片/箱)(5片/包)", "unit": "包", "price": 105}, {"seq": 41, "name": "玉米粒易開罐(285g/24罐/箱)", "unit": "罐", "price": 22}, {"seq": 42, "name": "滷蛋(30粒/8包/箱)", "unit": "包", "price": 240}, {"seq": 43, "name": "豆皮菜鬆(600g/包)", "unit": "包", "price": 110}, {"seq": 44, "name": "豆棗(3kg/包)", "unit": "包", "price": 320}, {"seq": 45, "name": "牛蒡絲(3kg/包)", "unit": "包", "price": 425}, {"seq": 46, "name": "飯糰米(5kg/1包)", "unit": "包", "price": 260}, {"seq": 47, "name": "紅藜麥(1kg/1包)", "unit": "包", "price": 165}, {"seq": 48, "name": "花生粉(600g/包)", "unit": "包", "price": 100}, {"seq": 49, "name": "低筋麵粉(3kg/包)", "unit": "包", "price": 110}, {"seq": 50, "name": "鹽(1kg/1包)", "unit": "包", "price": 20}, {"seq": 51, "name": "二砂(1kg/1包)", "unit": "包", "price": 40}, {"seq": 52, "name": "胡椒鹽(600g/包)", "unit": "包", "price": 120}, {"seq": 53, "name": "番茄醬(3.15kg/桶)", "unit": "桶", "price": 200}, {"seq": 54, "name": "醬油膏(6kg/桶)", "unit": "桶", "price": 235}, {"seq": 55, "name": "沙拉油(18L/桶)", "unit": "桶", "price": 865}, {"seq": 56, "name": "耐炸油(18L/桶)", "unit": "桶", "price": 875}, {"seq": 57, "name": "泰式紅茶葉(600g*/30包/箱)", "unit": "包", "price": 157}, {"seq": 58, "name": "蔗糖液(3kg/8包/箱)", "unit": "包", "price": 125}, {"seq": 59, "name": "專用奶精粉(1kg/20包/箱)", "unit": "包", "price": 173}]}, {"id": "gu_pack_order", "title": "咕咕包材叫貨", "formNo": "表格編號：1140401", "items": [{"seq": 1, "name": "400空白紙杯(50個/20包/箱)", "unit": "包", "price": 53}, {"seq": 2, "name": "凸杯蓋 90mm(50個/20包/箱)", "unit": "包", "price": 49}, {"seq": 3, "name": "90熱杯套(25個/40包/箱)", "unit": "串", "price": 20}, {"seq": 4, "name": "1.5OZ PET塑膠杯蓋(100個/25包/箱)", "unit": "包", "price": 92}, {"seq": 5, "name": "850空白紙湯碗(50個/12包/箱)", "unit": "包", "price": 60}, {"seq": 6, "name": "850平蓋(50個/12包/箱)", "unit": "包", "price": 29}, {"seq": 7, "name": "260空白紙湯碗(50個/40包/箱)", "unit": "包", "price": 30}, {"seq": 8, "name": "空白一體小(60個/10包/箱)", "unit": "包", "price": 83}, {"seq": 9, "name": "空白點心盒(100個/10包/箱)", "unit": "包", "price": 95}, {"seq": 10, "name": "20*20CM防油牛皮L袋(100張/40包/箱)", "unit": "包", "price": 88}, {"seq": 11, "name": "20*20CM防油牛皮L袋(200張/25包/箱)", "unit": "包", "price": 172}, {"seq": 12, "name": "30*30CM空白淋膜紙(1000張/4包/箱)", "unit": "包", "price": 900}, {"seq": 13, "name": "4兩防油紙袋(100入/束)", "unit": "束", "price": 40}, {"seq": 14, "name": "薯條袋", "unit": "束", "price": 35}, {"seq": 15, "name": "橡皮筋小", "unit": "包", "price": 50}, {"seq": 16, "name": "0號夾鏈袋", "unit": "包", "price": 15}, {"seq": 17, "name": "擦手紙(120抽/20包/箱)", "unit": "箱", "price": 410}, {"seq": 18, "name": "黑色西餐匙(100支/40包/箱)", "unit": "包", "price": 46}, {"seq": 19, "name": "黑色西餐叉(100支/30包/2箱)", "unit": "包", "price": 45}, {"seq": 20, "name": "單支膠裝斜口6*18透明吸管(200支/20包/箱)", "unit": "包", "price": 26}, {"seq": 21, "name": "單支紙包斜口6*21透明吸管(100支/50包/箱)", "unit": "包", "price": 46}, {"seq": 22, "name": "免洗筷(80雙/30包/袋)", "unit": "包", "price": 21}, {"seq": 23, "name": "環保餐巾紙23cm單層(100張/60包/箱)", "unit": "包", "price": 22}, {"seq": 24, "name": "空白封口膜(350m/6捲/箱)", "unit": "捲", "price": 352}, {"seq": 25, "name": "感熱紙80*80mm(60捲/箱)", "unit": "捲", "price": 22}, {"seq": 26, "name": "標籤貼紙40*30mm(5捲/20包/箱)", "unit": "包", "price": 139}, {"seq": 27, "name": "保鮮膜30公分 X 500公尺", "unit": "盒", "price": 399}, {"seq": 28, "name": "4兩耐熱袋", "unit": "包", "price": 40}, {"seq": 29, "name": "6兩耐熱袋", "unit": "包", "price": 40}, {"seq": 30, "name": "6兩耐熱袋(捲)", "unit": "捲", "price": 180}, {"seq": 31, "name": "1斤耐熱袋", "unit": "捲", "price": 180}, {"seq": 32, "name": "3斤耐熱袋", "unit": "捲", "price": 180}, {"seq": 33, "name": "10斤耐熱袋", "unit": "捲", "price": 180}, {"seq": 34, "name": "煎板清潔劑", "unit": "瓶", "price": 303}, {"seq": 35, "name": "水槽濾網(50入/包)", "unit": "包", "price": 35}, {"seq": 36, "name": "沙拉脫", "unit": "桶", "price": 50}, {"seq": 37, "name": "漂白水", "unit": "桶", "price": 50}, {"seq": 38, "name": "除油劑", "unit": "桶", "price": 210}, {"seq": 39, "name": "酒精", "unit": "桶", "price": 505}, {"seq": 40, "name": "3M菜瓜布(2入/包)", "unit": "包", "price": 45}, {"seq": 41, "name": "3M綠菜瓜布(2入/包)", "unit": "包", "price": 45}, {"seq": 42, "name": "好神拖布盤", "unit": "個", "price": 230}, {"seq": 43, "name": "塑膠垃圾袋66*80(10包/箱)", "unit": "包", "price": 97}, {"seq": 44, "name": "咕咕logo圓貼(5000張)(約1~4天)", "unit": "包", "price": 1380}, {"seq": 45, "name": "收入傳票", "unit": "本", "price": 25}, {"seq": 46, "name": "支出傳票", "unit": "本", "price": 25}, {"seq": 47, "name": "二聯收據(50組/本)", "unit": "本", "price": 35}, {"seq": 48, "name": "透明膠帶18mm(8入/捆)", "unit": "捆", "price": 95}, {"seq": 49, "name": "NBR無粉手套紫S號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 50, "name": "NBR無粉手套紫M號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 51, "name": "NBR無粉手套紫L號(100入/盒)", "unit": "盒", "price": 185}, {"seq": 52, "name": "NBR無粉手套紫XL號(100入/盒)", "unit": "盒", "price": 185}]}];
+var _orderSheetIdx=0;
+var _orderKey='hm_app_order_';
+
+function renderOrder(c,d){
+  var html='<div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:10px;padding-bottom:4px">';
+  SHEETS.forEach(function(s,i){
+    html+='<button onclick="switchOrderSheet('+i+')" style="flex-shrink:0;padding:8px 14px;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1.5px solid '+(i===_orderSheetIdx?'var(--amber)':'var(--brd)')+';background:'+(i===_orderSheetIdx?'var(--amber-l)':'#fff')+';color:'+(i===_orderSheetIdx?'var(--amber)':'var(--txt2)')+';font-family:inherit">'+s.title.replace('叫貨','')+'</button>';
+  });
+  html+='</div>';
+  
+  html+='<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center"><div class="fg" style="flex:1;margin:0"><input id="ord-search" placeholder="🔍 搜尋品名..." oninput="filterOrderItems()" style="padding:8px 12px"></div><div style="font-size:0.78rem;color:var(--txt3);white-space:nowrap" id="ord-filled">0 項</div></div>';
+  
+  html+='<div id="ord-items"></div>';
+  
+  html+='<div style="position:sticky;bottom:60px;background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;z-index:10"><div><div style="font-size:0.78rem;color:var(--txt3)">本頁合計</div><div style="font-size:1.2rem;font-weight:700;color:var(--amber)" id="ord-total">$0</div></div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-out" onclick="clearOrderSheet()">清除</button><button class="btn btn-sm btn-pri" onclick="saveOrderSheet()">💾 儲存</button></div></div>';
+  
+  c.innerHTML=html;
+  buildOrderItems();
+}
+
+function buildOrderItems(){
+  var s=SHEETS[_orderSheetIdx];
+  var wrap=document.getElementById('ord-items');if(!wrap)return;
+  var q=(document.getElementById('ord-search')||{}).value||'';
+  q=q.toLowerCase();
+  var saved=loadOrderData(s.id);
+  var items=s.items;
+  if(q)items=items.filter(function(it){return it.name.toLowerCase().includes(q)});
+  
+  var html='';
+  items.forEach(function(it){
+    var qty=saved[it.seq]||'';
+    var amt=qty?Math.round(parseFloat(qty)*it.price):0;
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #ECEAE4">';
+    html+='<div style="min-width:24px;font-size:0.72rem;color:var(--txt3);text-align:center">'+it.seq+'</div>';
+    html+='<div style="flex:1;min-width:0"><div style="font-size:0.84rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.name)+'</div><div style="font-size:0.72rem;color:var(--txt3)">'+esc(it.unit)+' / $'+it.price+'</div></div>';
+    html+='<input type="number" min="0" step="0.5" value="'+qty+'" data-seq="'+it.seq+'" data-price="'+it.price+'" onchange="onOrderQtyChange(this)" style="width:60px;border:1.5px solid '+(qty?'var(--amber)':'var(--brd)')+';border-radius:6px;padding:6px;text-align:center;font-size:0.92rem;font-weight:'+(qty?'700':'400')+';background:'+(qty?'var(--amber-l)':'var(--bg)')+';color:var(--txt);font-family:inherit">';
+    html+='<div style="min-width:55px;text-align:right;font-size:0.84rem;font-weight:700;color:'+(amt?'var(--pri)':'var(--txt3)')+'" data-amt="'+it.seq+'">'+(amt?'$'+fmt(amt):'—')+'</div>';
+    html+='</div>';
+  });
+  wrap.innerHTML=html;
+  updateOrderTotal();
+}
+
+window.onOrderQtyChange=function(inp){
+  var seq=inp.dataset.seq;var price=parseFloat(inp.dataset.price);
+  var qty=parseFloat(inp.value)||0;
+  inp.style.borderColor=qty?'var(--amber)':'var(--brd)';
+  inp.style.fontWeight=qty?'700':'400';
+  inp.style.background=qty?'var(--amber-l)':'var(--bg)';
+  var amtEl=document.querySelector('[data-amt="'+seq+'"]');
+  if(amtEl){var amt=qty?Math.round(qty*price):0;amtEl.textContent=amt?'$'+fmt(amt):'—';amtEl.style.color=amt?'var(--pri)':'var(--txt3)'}
+  
+  var s=SHEETS[_orderSheetIdx];
+  var saved=loadOrderData(s.id);
+  if(qty)saved[seq]=qty;else delete saved[seq];
+  saveOrderData(s.id,saved);
+  updateOrderTotal();
+};
+
+function updateOrderTotal(){
+  var s=SHEETS[_orderSheetIdx];var saved=loadOrderData(s.id);
+  var total=0;var filled=0;
+  s.items.forEach(function(it){var q=saved[it.seq];if(q){total+=Math.round(parseFloat(q)*it.price);filled++}});
+  var el=document.getElementById('ord-total');if(el)el.textContent='$'+fmt(total);
+  var fl=document.getElementById('ord-filled');if(fl)fl.textContent=filled+' 項已填';
+}
+
+function loadOrderData(sheetId){
+  try{return JSON.parse(localStorage.getItem(_orderKey+sheetId+'_'+toDay())||'{}')}catch(e){return{}}
+}
+function saveOrderData(sheetId,data){
+  try{localStorage.setItem(_orderKey+sheetId+'_'+toDay(),JSON.stringify(data))}catch(e){}
+}
+
+window.switchOrderSheet=function(idx){_orderSheetIdx=idx;switchTab('order')};
+
+window.filterOrderItems=function(){buildOrderItems()};
+
+window.clearOrderSheet=function(){
+  if(!confirm('確定清除所有已填數量？'))return;
+  var s=SHEETS[_orderSheetIdx];
+  saveOrderData(s.id,{});
+  buildOrderItems();
+  showToast('已清除');
+};
+
+window.saveOrderSheet=function(){
+  var s=SHEETS[_orderSheetIdx];var saved=loadOrderData(s.id);
+  var filled=Object.keys(saved).length;
+  if(!filled){showToast('尚未填寫任何數量');return}
+  
+  // Build transfer records for each filled item
+  if(!app.data)app.data={};
+  if(!app.data.transfers)app.data.transfers=[];
+  
+  var items=[];
+  s.items.forEach(function(it){
+    var q=saved[it.seq];
+    if(q){items.push({name:it.name,qty:parseFloat(q),unit:it.unit,price:it.price})}
+  });
+  
+  // Create one transfer per order
+  app.data.transfers.push({
+    id:'TF'+Date.now(),date:toDay(),fromStore:'中央廚房',toStore:app.store,
+    itemName:s.title+' ('+filled+'項)',qty:filled,unit:'項',
+    status:'待確認',
+    note:'[APP叫貨-'+esc(app.user)+'] '+items.map(function(i){return i.name+'x'+i.qty}).join(', ')
+  });
+  
+  cloudPush();
+  showToast('✅ '+s.title+' 已提交 '+filled+' 項');
+};
+
+// ── ✅ Check (expiry, QC) ──
+function renderCheck(c,d){
+  var batches=(d.batchList||[]).filter(function(b){return b.status!=='已用完'&&(b.store===app.store||b.store==='中央廚房')});
+  var today=toDay();
+  var html='<div class="card"><div class="card-title">📅 效期檢查</div>';
+  if(!batches.length){html+='<div class="empty">無有效批次</div>'}
+  else{
+    batches.sort(function(a,b){return(a.expiryDate||'9').localeCompare(b.expiryDate||'9')});
+    batches.forEach(function(b){
+      var days=b.expiryDate?Math.ceil((new Date(b.expiryDate)-new Date(today))/86400000):'—';
+      var color=typeof days==='number'?(days<0?'var(--red)':days<=3?'var(--amber)':'var(--pri)'):'var(--txt3)';
+      var badge=typeof days==='number'?(days<0?'<span class="badge badge-err">已過期</span>':days<=3?'<span class="badge badge-warn">即將到期</span>':'<span class="badge badge-ok">正常</span>'):'';
+      html+='<div class="list-item"><div><div style="font-weight:600">'+esc(b.itemName)+'</div><div style="font-size:0.78rem;color:var(--txt3)">批號 '+esc(b.batchNo)+' ｜ '+esc(b.store)+'</div></div><div style="text-align:right"><div style="font-weight:700;color:'+color+'">'+(typeof days==='number'?(days<0?'過期'+Math.abs(days)+'天':days+'天'):'—')+'</div>'+badge+'</div></div>';
+    });
+  }
+  html+='</div>';
+  
+  // Quick QC check
+  html+='<div class="card"><div class="card-title">🌡️ 快速溫度記錄</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="fg"><label>設備/位置</label><select id="qc-where"><option>冷藏庫</option><option>冷凍庫</option><option>展示冰箱</option><option>備料區</option></select></div><div class="fg"><label>溫度 °C</label><input id="qc-temp" type="number" step="0.1" placeholder="例：4.2"></div></div>';
+  html+='<button class="btn btn-pri" onclick="submitQC()">📝 記錄溫度</button></div>';
+  c.innerHTML=html;
+}
+
+window.submitQC=function(){
+  var where=(document.getElementById('qc-where')||{}).value||'';
+  var temp=(document.getElementById('qc-temp')||{}).value||'';
+  if(!temp){showToast('請輸入溫度');return}
+  if(!app.data)app.data={};
+  if(!app.data.haccpLogs)app.data.haccpLogs=[];
+  app.data.haccpLogs.push({
+    id:'HP'+Date.now(),date:toDay(),ccp:'CCP2-冷藏溫度',
+    value:temp+'°C',upper:'7°C',lower:'0°C',
+    result:parseFloat(temp)>=0&&parseFloat(temp)<=7?'符合':'偏離',
+    action:'',recorder:app.user+' ('+app.store+')'
+  });
+  cloudPush();
+  showToast('✅ 溫度已記錄');
+  document.getElementById('qc-temp').value='';
+};
+
+// ── ⚙️ More ──
+function renderMore(c,d){
+  var html='<div class="card"><div class="card-title">⚙️ APP 設定</div>';
+  html+='<div class="fg"><label>目前門市</label><div style="font-weight:700;font-size:1rem;padding:6px 0">'+esc(app.store)+'</div></div>';
+  html+='<div class="fg"><label>使用者</label><div style="font-weight:700;padding:6px 0">'+esc(app.user)+'</div></div>';
+  html+='<div class="fg"><label>雲端連線</label><div style="font-size:0.88rem;color:var(--pri);padding:6px 0">🟢 Firebase SDK</div></div>';
+  html+='<div class="fg"><label>最後同步</label><div style="font-size:0.84rem;padding:6px 0">'+(app.lastSync?app.lastSync.slice(0,19).replace('T',' '):'尚未同步')+'</div></div>';
+  html+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
+  html+='<button class="btn btn-pri" onclick="cloudPull(function(ok){switchTab(\'home\');showToast(ok?\'✅ 同步成功\':\'❌ 同步失敗\')})">🔄 立即同步</button>';
+  html+='<button class="btn btn-out" onclick="showSetup()">🔧 切換門市/使用者</button>';
+  html+='<button class="btn btn-danger" onclick="if(confirm(\'確定登出？\')){app={store:\\\'\\\',user:\\\'\\\',role:\\\'\\\',firebaseUrl:\\\'\\\',lastSync:\\\'\\\',data:null};saveApp();showSetup()}">🚪 登出</button>';
+  html+='</div></div>';
+  
+  html+='<div class="card"><div class="card-title">📲 加入主畫面</div><div style="font-size:0.84rem;color:var(--txt2);line-height:1.7">iPhone：Safari 分享 → 加入主畫面<br>Android：Chrome 選單 → 新增至主畫面<br><br>加入後可像原生 APP 一樣開啟，全螢幕使用</div></div>';
+  c.innerHTML=html;
+}
+
+window.quickAdjust=function(){
+  var si=(app.data||{}).storeInv||[];
+  var myInv=si.filter(function(i){return i.store===app.store});
+  if(!myInv.length){showToast('無庫存品項');return}
+  var html='<div class="modal-title"><span>📝 快速盤點</span><button class="btn btn-sm btn-out" onclick="closeModal()">✕</button></div>';
+  html+='<div style="max-height:60vh;overflow-y:auto">';
+  myInv.forEach(function(i){
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #ECEAE4"><div style="flex:1;font-weight:600;font-size:0.88rem">'+esc(i.name)+'<div style="font-size:0.72rem;color:var(--txt3)">現有:'+fmt(i.stock,1)+' '+esc(i.unit)+'</div></div><input class="adj-input" data-id="'+i.id+'" type="number" min="0" step="0.1" placeholder="實際數量" style="width:80px;border:1.5px solid var(--brd);border-radius:6px;padding:6px 8px;font-size:0.92rem;text-align:center;font-family:inherit"></div>';
+  });
+  html+='</div><button class="btn btn-pri" style="margin-top:12px" onclick="submitBatchAdjust()">✅ 確認盤點並同步</button>';
+  showModal(html);
+};
+
+window.submitBatchAdjust=function(){
+  var inputs=document.querySelectorAll('.adj-input');
+  var si=(app.data||{}).storeInv||[];
+  var count=0;
+  inputs.forEach(function(inp){
+    var id=inp.dataset.id;var val=inp.value;
+    if(val==='')return;
+    var item=si.find(function(i){return i.id===id});
+    if(item){item.stock=parseFloat(val)||0;item.updatedAt=toDay();count++}
+  });
+  if(!count){showToast('未修改任何品項');return}
+  closeModal();
+  cloudPush();
+  switchTab('stock');
+  showToast('✅ 已盤點 '+count+' 項並同步');
+};
+
+// ── Modal ──
+function showModal(html){
+  var ov=document.createElement('div');ov.className='modal-ov';ov.id='app-modal';
+  ov.innerHTML='<div class="modal-box">'+html+'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)closeModal()});
+  document.body.appendChild(ov);
+}
+function closeModal(){var m=document.getElementById('app-modal');if(m)m.remove()}
+
+// ── Init ──
+if(app.store&&app.firebaseUrl){
+  document.getElementById('tab-bar').style.display='';
+  updateHeader();
+  cloudPull(function(ok){switchTab('home')});
+}else{
+  showSetup();
+}
+</script>
+</body>
+</html>
