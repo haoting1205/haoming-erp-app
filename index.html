@@ -64,7 +64,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <body>
 
 <div class="header">
-  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.1.0</span></div>
+  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.4.0</span></div>
   <div class="header-right" id="hdr-right"></div>
 </div>
 
@@ -81,11 +81,11 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <div class="toast" id="app-toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-database-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
 <script>
 // ── State ──
-var APP_VERSION='1.1.0';
-var APP_BUILD='20260418-002';
+var APP_VERSION='1.4.0';
+var APP_BUILD='20260422-001';
 var APP_KEY='hm_app_v1';
 var FIREBASE_CONFIG={
   apiKey:"AIzaSyAk8D1oXTYaq9E1t96bPW-1rMu0EhW1JzQ",
@@ -103,6 +103,12 @@ try{var saved=JSON.parse(localStorage.getItem(APP_KEY)||'{}');if(saved.store)Obj
 var currentTab='home';
 
 function saveApp(){try{localStorage.setItem(APP_KEY,JSON.stringify(app))}catch(e){}}
+var _appPushTimer=null;
+function saveAppAndSync(){
+  saveApp();
+  clearTimeout(_appPushTimer);
+  _appPushTimer=setTimeout(function(){cloudPush()},3000);
+}
 function showToast(msg){var t=document.getElementById('app-toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2200)}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fmt(n,d){return(n==null||isNaN(n))?'—':Number(n).toFixed(d||0).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
@@ -114,25 +120,29 @@ function initAppFirebase(){
   if(_appDb)return true;
   try{
     if(!firebase.apps.length){_appFb=firebase.initializeApp(FIREBASE_CONFIG)}else{_appFb=firebase.apps[0]}
-    _appDb=firebase.database();return true;
-  }catch(e){console.error('Firebase init:',e);return false}
+    _appDb=firebase.firestore();
+    return true;
+  }catch(e){console.error('Firestore init:',e);return false}
 }
 
 function cloudPull(cb){
   if(!initAppFirebase()){if(cb)cb(false);return}
-  _appDb.ref('erp_data').once('value')
-    .then(function(snap){
-      var res=snap.val();
-      if(res&&res.data){app.data=res.data;app.lastSync=new Date().toISOString();saveApp();if(cb)cb(true)}
-      else{if(cb)cb(false)}
+  _appDb.collection('erp').doc('state').get()
+    .then(function(doc){
+      if(doc.exists&&doc.data()&&doc.data().data){
+        app.data=doc.data().data;app.lastSync=new Date().toISOString();saveApp();if(cb)cb(true);
+      }else{if(cb)cb(false)}
     }).catch(function(){if(cb)cb(false)});
 }
 
 function cloudPush(){
   if(!initAppFirebase()||!app.data)return;
-  var payload={data:app.data,updated_at:new Date().toISOString(),device:'APP-'+(app.store||'mobile')};
-  _appDb.ref('erp_data').set(payload)
-    .then(function(){app.lastSync=new Date().toISOString();saveApp();showToast('✅ 已同步')})
+  var stateClone=JSON.parse(JSON.stringify(app.data));
+  _appDb.collection('erp').doc('state').set({
+    data:stateClone,
+    updated_at:firebase.firestore.FieldValue.serverTimestamp(),
+    device:'APP-'+(app.store||'mobile')
+  }).then(function(){app.lastSync=new Date().toISOString();saveApp();showToast('✅ 已同步')})
     .catch(function(){showToast('❌ 同步失敗')});
 }
 
@@ -438,7 +448,7 @@ function renderMore(c,d){
   var html='<div class="card"><div class="card-title">⚙️ APP 設定</div>';
   html+='<div class="fg"><label>目前門市</label><div style="font-weight:700;font-size:1rem;padding:6px 0">'+esc(app.store)+'</div></div>';
   html+='<div class="fg"><label>使用者</label><div style="font-weight:700;padding:6px 0">'+esc(app.user)+'</div></div>';
-  html+='<div class="fg"><label>雲端連線</label><div style="font-size:0.88rem;color:var(--pri);padding:6px 0">🟢 Firebase SDK</div></div>';
+  html+='<div class="fg"><label>雲端連線</label><div style="font-size:0.88rem;color:var(--pri);padding:6px 0">🟢 Firestore</div></div>';
   html+='<div class="fg"><label>最後同步</label><div style="font-size:0.84rem;padding:6px 0">'+(app.lastSync?app.lastSync.slice(0,19).replace('T',' '):'尚未同步')+'</div></div>';
   html+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">';
   html+='<button class="btn btn-pri" onclick="cloudPull(function(ok){switchTab(\'home\');showToast(ok?\'✅ 同步成功\':\'❌ 同步失敗\')})">🔄 立即同步</button>';
