@@ -737,6 +737,16 @@ function renderMore(c,d){
   html+='</div></div>';
   
   html+='<div class="card"><div class="card-title">📲 加入主畫面</div><div style="font-size:0.84rem;color:var(--txt2);line-height:1.7">iPhone：Safari 分享 → 加入主畫面<br>Android：Chrome 選單 → 新增至主畫面<br><br>加入後可像原生 APP 一樣開啟，全螢幕使用</div></div>';
+  
+  // 操作說明
+  html+='<div class="card"><div class="card-title">📖 操作說明</div>';
+  html+='<details style="margin-bottom:8px"><summary style="cursor:pointer;padding:6px 0;font-weight:600;font-size:0.92rem">📦 庫存管理</summary><div style="font-size:0.84rem;line-height:1.7;color:var(--txt2);padding:6px 0 6px 14px">• 點「📦 庫存」分頁查看所屬門市的食材跟包材<br>• 點「📝 快速盤點」批次更新所有品項數量<br>• 編輯單項可改現有庫存、安全庫存<br>• 系統會自動標記低於安全庫存的品項</div></details>';
+  html+='<details style="margin-bottom:8px"><summary style="cursor:pointer;padding:6px 0;font-weight:600;font-size:0.92rem">📋 叫貨流程</summary><div style="font-size:0.84rem;line-height:1.7;color:var(--txt2);padding:6px 0 6px 14px">• 點「📋 叫貨」分頁選擇對應的叫貨表<br>• 直接在數量欄位輸入要叫的數量<br>• 系統即時計算合計金額<br>• 點「💾 儲存」上傳到雲端，老闆看到後出貨<br>• 草稿會自動暫存，不用怕中斷</div></details>';
+  html+='<details style="margin-bottom:8px"><summary style="cursor:pointer;padding:6px 0;font-weight:600;font-size:0.92rem">✅ 開店/打烊檢查</summary><div style="font-size:0.84rem;line-height:1.7;color:var(--txt2);padding:6px 0 6px 14px">• 點「✅ 檢查」分頁逐項勾選 SOP 項目<br>• 完成後系統記錄時間、人員<br>• 老闆可在生管系統看到各門市完成度</div></details>';
+  html+='<details style="margin-bottom:8px"><summary style="cursor:pointer;padding:6px 0;font-weight:600;font-size:0.92rem">🛒 客戶下單功能</summary><div style="font-size:0.84rem;line-height:1.7;color:var(--txt2);padding:6px 0 6px 14px">• 此 APP 也是 B2B 客戶的下單入口<br>• 客戶用 <code style="background:#F3F1EB;padding:1px 4px;border-radius:3px">?customer=1</code> 網址登入下單<br>• 老闆建客戶資料後傳客戶代碼給對方<br>• 員工模式跟客戶模式互不影響</div></details>';
+  html+='<details><summary style="cursor:pointer;padding:6px 0;font-weight:600;font-size:0.92rem">⚠️ 常見問題</summary><div style="font-size:0.84rem;line-height:1.7;color:var(--txt2);padding:6px 0 6px 14px"><b>同步失敗？</b><br>檢查網路後點「🔄 立即同步」<br><br><b>看不到最新資料？</b><br>下拉重整或重開 APP<br><br><b>切換門市？</b><br>點「🔧 切換門市/使用者」<br><br><b>客戶代碼登入失敗？</b><br>若代碼正確卻無法登入，可能是時間窗或額度問題，請聯繫老闆</div></details>';
+  html+='</div>';
+  
   c.innerHTML=html;
 }
 
@@ -814,8 +824,769 @@ if('serviceWorker' in navigator){
   }catch(e){console.log('[SW] 不支援:',e.message);}
 }
 
+// ══════════════════════════════════════════════════════
+// M1 客戶模式 — 偵測 URL ?customer=1 進入客戶下單
+// ══════════════════════════════════════════════════════
+function _isCustomerMode(){
+  var qs=window.location.search;
+  return qs.indexOf('customer=1')>=0||qs.indexOf('customer=true')>=0;
+}
+function _getQueryParam(name){
+  var m=window.location.search.match(new RegExp('[?&]'+name+'=([^&]*)'));
+  return m?decodeURIComponent(m[1]):'';
+}
+
+// 客戶身份狀態
+var custApp={code:'',customer:null,storeName:''};
+try{
+  var savedCustApp=localStorage.getItem('hm-cust-app');
+  if(savedCustApp)custApp=Object.assign(custApp,JSON.parse(savedCustApp));
+}catch(e){}
+function saveCustApp(){
+  try{localStorage.setItem('hm-cust-app',JSON.stringify(custApp))}catch(e){}
+}
+function clearCustApp(){
+  custApp={code:'',customer:null,storeName:''};
+  try{localStorage.removeItem('hm-cust-app')}catch(e){}
+}
+
+// 風險檢查 — 額度 + 時間窗
+function _checkCustRisk(c){
+  var errs=[];
+  // 1. 狀態檢查
+  if(c.status==='suspended')errs.push('您的帳號已被暫停,請聯繫商家');
+  else if(c.status==='archived')errs.push('您的帳號已封存,請聯繫商家');
+  
+  // 2. 時間窗
+  var now=new Date();
+  var dow=now.getDay();
+  var hr=now.getHours();
+  var days=Array.isArray(c.orderDays)?c.orderDays:[1,2,3,4,5,6,0];
+  var dayNames=['週日','週一','週二','週三','週四','週五','週六'];
+  if(days.indexOf(dow)<0){
+    var allowDays=days.map(function(d){return dayNames[d]}).join('、');
+    errs.push('目前('+dayNames[dow]+')非接單日\n允許下單日:'+allowDays);
+  }
+  var h1=c.orderHourStart||0;
+  var h2=c.orderHourEnd||24;
+  if(hr<h1||hr>=h2){
+    errs.push('目前('+hr+'點)非接單時段\n允許時段:'+h1+':00 ~ '+h2+':00');
+  }
+  
+  // 3. 額度檢查 (此處只檢查是否已超額,不檢查本次訂單)
+  var lim=c.creditLimit||0;
+  var used=c.creditUsed||0;
+  if(lim>0&&used>=lim){
+    errs.push('您的累積未結金額已達授信額度\n額度: $'+lim.toLocaleString()+',已用: $'+used.toLocaleString());
+  }
+  
+  return errs;
+}
+
+// 客戶登入畫面
+function showCustomerLogin(prefilledCode){
+  document.getElementById('tab-bar').style.display='none';
+  var c=document.getElementById('app-content');
+  c.innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:70vh;padding:20px"><div class="login-box" style="background:var(--card);max-width:380px;width:100%">'+
+    '<div style="text-align:center;margin-bottom:20px"><div style="width:48px;height:48px;background:#0A5A46;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.3rem">客</div><div style="font-weight:700;font-size:1.1rem">好洺餐飲 — 客戶下單</div><div style="font-size:0.82rem;color:var(--txt3);margin-top:4px">請輸入您的客戶代碼</div></div>'+
+    '<div class="fg"><label>客戶代碼 (3 位數字)</label><input id="cust-code" type="text" maxlength="3" pattern="\\d{3}" inputmode="numeric" value="'+(prefilledCode||'')+'" placeholder="例:001" style="text-align:center;font-size:1.5rem;font-weight:700;font-family:monospace;letter-spacing:8px"></div>'+
+    '<button class="btn btn-pri" onclick="doCustLogin()" style="margin-top:12px">登入下單</button>'+
+    '<div id="cust-login-err" style="margin-top:10px;color:#B82525;font-size:0.84rem;display:none"></div>'+
+    '<div style="text-align:center;margin-top:20px;font-size:0.78rem;color:var(--txt3)"><div>沒有客戶代碼?</div><div>請聯繫商家取得</div></div>'+
+    '<div style="margin-top:16px;text-align:center"><a href="?" style="font-size:0.78rem;color:var(--txt3);text-decoration:underline">← 返回員工模式</a></div>'+
+    '</div></div>';
+  // 自動聚焦
+  setTimeout(function(){var inp=document.getElementById('cust-code');if(inp)inp.focus()},100);
+  // 按 Enter 登入
+  setTimeout(function(){
+    var inp=document.getElementById('cust-code');
+    if(inp){
+      inp.addEventListener('keydown',function(e){
+        if(e.key==='Enter')doCustLogin();
+      });
+    }
+  },150);
+}
+window.showCustomerLogin=showCustomerLogin;
+
+function doCustLogin(){
+  var code=(document.getElementById('cust-code')||{}).value||'';
+  code=code.trim();
+  var errEl=document.getElementById('cust-login-err');
+  function showErr(msg){
+    if(errEl){errEl.textContent=msg;errEl.style.display='block'}
+  }
+  if(!/^\d{3}$/.test(code)){showErr('代碼必須是 3 位數字 (000-999)');return}
+  
+  showToast('🔄 驗證中...');
+  // 從 Firebase 讀取客戶資料
+  cloudPull(function(ok){
+    if(!ok){
+      showErr('連線失敗,請檢查網路');
+      return;
+    }
+    if(!app.data||!app.data.customers){
+      showErr('系統尚未設定客戶資料,請聯繫商家');
+      return;
+    }
+    var customer=app.data.customers.find(function(x){return x.code===code});
+    if(!customer){
+      showErr('找不到此代碼,請確認後再試');
+      return;
+    }
+    
+    // 風險檢查
+    var errs=_checkCustRisk(customer);
+    if(errs.length>0){
+      showErr(errs.join('\n\n'));
+      return;
+    }
+    
+    // 登入成功
+    custApp.code=code;
+    custApp.customer=customer;
+    custApp.storeName=customer.name;
+    saveCustApp();
+    
+    showCustomerHome();
+  });
+}
+window.doCustLogin=doCustLogin;
+
+// 客戶首頁 (M2A: 加入下單按鈕)
+function showCustomerHome(){
+  document.getElementById('tab-bar').style.display='none';
+  var c=document.getElementById('app-content');
+  var cust=custApp.customer;
+  if(!cust){showCustomerLogin();return}
+  
+  var lim=cust.creditLimit||0;
+  var used=cust.creditUsed||0;
+  // M2A: 從 custOrders 動態算已用,優先採用
+  if(app.data&&app.data.custOrders){
+    used=app.data.custOrders.filter(function(o){return o.custId===cust.id&&['approved','shipped','invoiced'].indexOf(o.status)>=0}).reduce(function(s,o){return s+(o.total||0)},0);
+  }
+  var avail=Math.max(0,lim-used);
+  var pct=lim?Math.round(used/lim*100):0;
+  
+  // M2A: 計算「我的訂單」數量
+  var myOrders=(app.data&&app.data.custOrders)?app.data.custOrders.filter(function(o){return o.custId===cust.id}):[];
+  var pendingCount=myOrders.filter(function(o){return o.status==='pending'}).length;
+  var activeCount=myOrders.filter(function(o){return ['approved','shipped','invoiced'].indexOf(o.status)>=0}).length;
+  
+  c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+    // Header
+    '<div class="card" style="background:linear-gradient(135deg,#0A5A46 0%,#16876D 100%);color:#fff;padding:20px;text-align:center;margin-bottom:14px">'+
+      '<div style="font-size:0.84rem;opacity:0.85">您好</div>'+
+      '<div style="font-size:1.4rem;font-weight:700;margin:4px 0">'+esc(cust.name)+'</div>'+
+      '<div style="font-size:0.78rem;opacity:0.8">客戶代碼: '+esc(cust.code)+(cust.discountRate&&cust.discountRate<1?' ｜ 專屬 '+(cust.discountRate*10)+'折':'')+'</div>'+
+    '</div>'+
+    
+    // 額度資訊
+    (lim>0?'<div class="card" style="padding:14px;margin-bottom:14px">'+
+      '<div style="font-size:0.84rem;color:var(--txt3);margin-bottom:6px">📊 信用額度</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">'+
+        '<div style="font-size:0.78rem;color:var(--txt3)">已用 / 總額</div>'+
+        '<div><span style="font-size:1.1rem;font-weight:700;color:'+(pct>80?'#B82525':'#444')+'">$'+used.toLocaleString()+'</span><span style="font-size:0.84rem;color:var(--txt3)">/$'+lim.toLocaleString()+'</span></div>'+
+      '</div>'+
+      '<div style="height:8px;background:#E8E5DA;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct>80?'#B82525':pct>60?'#D4950F':'#0A5A46')+';transition:width .3s"></div></div>'+
+      '<div style="font-size:0.78rem;color:#0A5A46;margin-top:8px;text-align:right">可用 $'+avail.toLocaleString()+'</div>'+
+    '</div>':'')+
+    
+    // M2A: 下單入口 - 大按鈕
+    '<button class="btn btn-pri" onclick="showCustomerOrder()" style="width:100%;padding:18px;font-size:1.1rem;font-weight:700;margin-bottom:10px;background:#0A5A46">🛒 立即下單</button>'+
+    
+    // M2A: 我的訂單 - 入口
+    '<button class="btn btn-out" onclick="showCustomerOrderHistory()" style="width:100%;padding:14px;margin-bottom:14px">📋 我的訂單'+(pendingCount?' <span style="display:inline-block;background:#D4950F;color:#fff;padding:1px 8px;border-radius:10px;font-size:0.78rem;margin-left:6px">'+pendingCount+' 筆待審核</span>':'')+(activeCount?' <span style="display:inline-block;background:#0A5A46;color:#fff;padding:1px 8px;border-radius:10px;font-size:0.78rem;margin-left:6px">'+activeCount+' 筆處理中</span>':'')+'</button>'+
+    
+    // 帳號資訊
+    '<div class="card" style="padding:14px;margin-bottom:14px">'+
+      '<div style="font-size:0.84rem;color:var(--txt3);margin-bottom:8px">👤 帳號資訊</div>'+
+      (cust.contact?'<div style="font-size:0.88rem;margin-bottom:4px"><span style="color:var(--txt3);min-width:60px;display:inline-block">聯絡人:</span>'+esc(cust.contact)+'</div>':'')+
+      (cust.phone?'<div style="font-size:0.88rem;margin-bottom:4px"><span style="color:var(--txt3);min-width:60px;display:inline-block">電話:</span>'+esc(cust.phone)+'</div>':'')+
+      (cust.taxId?'<div style="font-size:0.88rem;margin-bottom:4px"><span style="color:var(--txt3);min-width:60px;display:inline-block">統編:</span>'+esc(cust.taxId)+'</div>':'')+
+      (cust.payTerm?'<div style="font-size:0.88rem;margin-bottom:4px"><span style="color:var(--txt3);min-width:60px;display:inline-block">付款:</span>'+esc(cust.payTerm)+'</div>':'')+
+    '</div>'+
+    
+    // 操作說明
+    '<div class="card" style="padding:14px;margin-bottom:14px">'+
+      '<div style="font-size:0.84rem;color:var(--txt3);margin-bottom:8px">📖 操作說明</div>'+
+      '<details style="margin-bottom:6px"><summary style="cursor:pointer;padding:4px 0;font-weight:600;font-size:0.88rem">🛒 如何下單</summary><div style="font-size:0.82rem;line-height:1.7;color:var(--txt2);padding:4px 0 4px 12px">1. 點「🛒 立即下單」進入下單頁<br>2. 用搜尋框找品項或瀏覽分類<br>3. 點 + / − 或直接輸入數量<br>4. 底部即時顯示合計金額<br>5. 點「📤 送出訂單」確認<br>6. 商家審核後會處理出貨</div></details>'+
+      '<details style="margin-bottom:6px"><summary style="cursor:pointer;padding:4px 0;font-weight:600;font-size:0.88rem">📋 訂單狀態說明</summary><div style="font-size:0.82rem;line-height:1.7;color:var(--txt2);padding:4px 0 4px 12px">⏳ <b>待審核</b>：商家尚未確認<br>✅ <b>已核准</b>：商家確認，準備出貨<br>🚚 <b>已出貨</b>：商品已寄出<br>🧾 <b>已開發票</b>：發票已開立<br>💰 <b>已付款</b>：商家確認收款<br>✔ <b>已完成</b>：訂單結案<br>↩️ <b>退貨中</b>：退貨申請審核中<br>💸 <b>已退款</b>：商家已退款</div></details>'+
+      '<details style="margin-bottom:6px"><summary style="cursor:pointer;padding:4px 0;font-weight:600;font-size:0.88rem">💰 信用額度說明</summary><div style="font-size:0.82rem;line-height:1.7;color:var(--txt2);padding:4px 0 4px 12px">• <b>授信額度</b>：商家設定的最大未結金額<br>• <b>已用</b>：已下單未付款的累積金額<br>• <b>可用</b>：可下單的剩餘額度<br>• 收款後額度會釋出可繼續下單<br>• 退款核准後額度自動回補<br><br>若超過可用額度，下單會被擋下，請先付款或聯繫商家提升額度</div></details>'+
+      '<details style="margin-bottom:6px"><summary style="cursor:pointer;padding:4px 0;font-weight:600;font-size:0.88rem">↩️ 如何申請退貨</summary><div style="font-size:0.82rem;line-height:1.7;color:var(--txt2);padding:4px 0 4px 12px">1. 點「📋 我的訂單」找到要退的訂單<br>2. 訂單需在「已付款」或「已完成」狀態<br>3. 點訂單卡片上的「↩️ 申請退貨」<br>4. 選擇要退的品項與數量<br>5. 填寫退貨原因與說明<br>6. 送出後等待商家審核</div></details>'+
+      '<details><summary style="cursor:pointer;padding:4px 0;font-weight:600;font-size:0.88rem">⚠️ 常見問題</summary><div style="font-size:0.82rem;line-height:1.7;color:var(--txt2);padding:4px 0 4px 12px"><b>無法登入？</b><br>確認代碼正確；若顯示「非接單時段/日」是商家設定的下單時間限制<br><br><b>看不到品項？</b><br>商家可能尚未上架，請聯繫商家<br><br><b>已下單但未顯示？</b><br>下拉重整或重新登入；若還沒看到請聯繫商家確認<br><br><b>價格跟之前不一樣？</b><br>商家可能調整售價或設定您的專屬折扣</div></details>'+
+    '</div>'+
+    
+    '<button class="btn btn-out" style="width:100%" onclick="custLogout()">登出</button>'+
+    '</div>';
+}
+window.showCustomerHome=showCustomerHome;
+
+// ═══════════════════════════════════════════════════════
+// M2A 客戶下單頁
+// ═══════════════════════════════════════════════════════
+
+// 取得客戶可訂購的品項清單 (B+C: internalProducts + 食材庫存中 customerSell=true)
+function _getCustOrderableItems(){
+  var items=[];
+  // B: 轉售品項
+  if(app.data&&app.data.internalProducts){
+    app.data.internalProducts.forEach(function(p){
+      items.push({
+        id:p.id,
+        source:'internal',
+        name:p.name,
+        unit:p.unit||'包',
+        cat:p.cat||'轉售品項',
+        price:+p.sellPrice||+p.price||0,
+        cost:+p.cost||0
+      });
+    });
+  }
+  // C: 食材庫存中標記對外可賣
+  if(app.data&&app.data.ings){
+    app.data.ings.filter(function(i){return i.customerSell===true}).forEach(function(i){
+      items.push({
+        id:i.id,
+        source:'ing',
+        name:i.name,
+        unit:i.unit||'公斤',
+        cat:i.cat||'食材',
+        price:+i.sellPrice||+i.price||0,
+        cost:+i.price||0
+      });
+    });
+  }
+  return items;
+}
+
+// 應用客戶折扣率
+function _applyDiscount(price,cust){
+  var rate=cust.discountRate||1;
+  return Math.round(price*rate*100)/100;
+}
+
+// 客戶端購物車 (記憶體中,送出後清空)
+var custCart={};
+
+function showCustomerOrder(){
+  document.getElementById('tab-bar').style.display='none';
+  var cust=custApp.customer;
+  if(!cust){showCustomerLogin();return}
+  
+  // 重新檢查風險
+  if(app.data&&app.data.customers){
+    var freshCust=app.data.customers.find(function(x){return x.code===cust.code});
+    if(freshCust){
+      var errs=_checkCustRisk(freshCust);
+      if(errs.length){
+        showToast(errs[0],'error');
+        showCustomerHome();
+        return;
+      }
+      custApp.customer=freshCust;
+      saveCustApp();
+      cust=freshCust;
+    }
+  }
+  
+  var items=_getCustOrderableItems();
+  if(items.length===0){
+    var c=document.getElementById('app-content');
+    c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+      '<div class="card" style="padding:30px;text-align:center">'+
+        '<div style="font-size:2.5rem;margin-bottom:12px">📭</div>'+
+        '<div style="font-weight:700;margin-bottom:6px">目前沒有可訂購品項</div>'+
+        '<div style="font-size:0.84rem;color:var(--txt3)">請聯繫商家確認商品上架狀況</div>'+
+      '</div>'+
+      '<button class="btn btn-out" onclick="showCustomerHome()" style="width:100%;margin-top:14px">← 返回首頁</button>'+
+      '</div>';
+    return;
+  }
+  
+  // 按類別分組
+  var byCat={};
+  items.forEach(function(it){
+    if(!byCat[it.cat])byCat[it.cat]=[];
+    byCat[it.cat].push(it);
+  });
+  
+  // 搜尋過濾(初始為空)
+  var c=document.getElementById('app-content');
+  c.innerHTML='<div style="padding:0;max-width:600px;margin:0 auto">'+
+    // Sticky header
+    '<div style="position:sticky;top:0;background:var(--bg);padding:12px 16px;border-bottom:1px solid var(--brd);z-index:5">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<button class="btn btn-out btn-sm" onclick="showCustomerHome()">←</button>'+
+        '<div style="flex:1;font-weight:700;font-size:1rem">🛒 下單 — '+esc(cust.name)+'</div>'+
+      '</div>'+
+      '<input id="cust-search" type="text" placeholder="🔍 搜尋品項名稱..." oninput="renderCustOrderItems()" style="width:100%;padding:8px 12px;border:1px solid var(--brd);border-radius:6px;font-family:inherit;font-size:0.92rem">'+
+    '</div>'+
+    
+    // 品項清單
+    '<div id="cust-order-items" style="padding:0 16px 12px"></div>'+
+    
+    // Sticky footer (購物車彙總)
+    '<div id="cust-cart-summary" style="position:sticky;bottom:0;background:var(--card);border-top:2px solid #0A5A46;padding:14px 16px;display:none;box-shadow:0 -4px 12px rgba(0,0,0,.08)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+        '<div><div style="font-size:0.78rem;color:var(--txt3)">已選 <span id="cust-cart-count">0</span> 項</div></div>'+
+        '<div><div style="font-size:0.78rem;color:var(--txt3)">合計</div><div style="font-size:1.3rem;font-weight:700;color:#0A5A46" id="cust-cart-total">$0</div></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px"><button class="btn btn-out" onclick="clearCustCart()" style="padding:10px 14px">清空</button><button class="btn btn-pri" onclick="confirmCustOrder()" style="flex:1;padding:10px;font-weight:700">📤 送出訂單</button></div>'+
+    '</div>'+
+    '</div>';
+  
+  // 初始渲染
+  renderCustOrderItems();
+}
+window.showCustomerOrder=showCustomerOrder;
+
+function renderCustOrderItems(){
+  var cust=custApp.customer;
+  if(!cust)return;
+  var items=_getCustOrderableItems();
+  var query=(document.getElementById('cust-search')||{}).value||'';
+  query=query.trim().toLowerCase();
+  
+  var filtered=query?items.filter(function(it){return it.name.toLowerCase().indexOf(query)>=0||(it.cat||'').toLowerCase().indexOf(query)>=0}):items;
+  
+  // 按類別分組
+  var byCat={};
+  filtered.forEach(function(it){
+    if(!byCat[it.cat])byCat[it.cat]=[];
+    byCat[it.cat].push(it);
+  });
+  
+  var html='';
+  var cats=Object.keys(byCat).sort();
+  if(filtered.length===0){
+    html='<div style="text-align:center;padding:40px 16px;color:var(--txt3)">📭 找不到符合的品項</div>';
+  }else{
+    cats.forEach(function(cat){
+      html+='<div style="font-size:0.84rem;font-weight:700;color:var(--txt3);padding:14px 0 6px">'+esc(cat)+' <span style="color:#999;font-weight:400">('+byCat[cat].length+')</span></div>';
+      byCat[cat].forEach(function(it){
+        var displayPrice=_applyDiscount(it.price,cust);
+        var qty=custCart[it.id]?custCart[it.id].qty:0;
+        var origPrice=it.price;
+        var hasDisc=cust.discountRate&&cust.discountRate<1&&displayPrice<origPrice;
+        html+='<div class="card" style="padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:0.92rem;font-weight:600;line-height:1.3">'+esc(it.name)+'</div>'+
+            '<div style="font-size:0.76rem;color:var(--txt3);margin-top:2px">'+
+              '<span style="color:#0A5A46;font-weight:700">$'+displayPrice+'</span>'+
+              (hasDisc?' <span style="text-decoration:line-through;color:#999;font-size:0.7rem">$'+origPrice+'</span>':'')+
+              ' / '+esc(it.unit)+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:4px">'+
+            '<button onclick="adjustCustCart(\''+esc(it.id)+'\',-1)" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--brd);background:#fff;cursor:pointer;font-size:1.1rem;font-weight:700">−</button>'+
+            '<input id="qty-'+esc(it.id)+'" type="number" min="0" step="0.5" value="'+qty+'" oninput="setCustCartQty(\''+esc(it.id)+'\',this.value)" style="width:50px;height:30px;text-align:center;border:1px solid var(--brd);border-radius:6px;font-family:inherit;font-size:0.92rem;font-weight:700">'+
+            '<button onclick="adjustCustCart(\''+esc(it.id)+'\',1)" style="width:30px;height:30px;border-radius:6px;border:1px solid var(--brd);background:#fff;cursor:pointer;font-size:1.1rem;font-weight:700">+</button>'+
+          '</div>'+
+          '</div>';
+      });
+    });
+  }
+  document.getElementById('cust-order-items').innerHTML=html;
+  updateCustCartSummary();
+}
+window.renderCustOrderItems=renderCustOrderItems;
+
+window.adjustCustCart=function(itemId,delta){
+  var cur=custCart[itemId]?custCart[itemId].qty:0;
+  var newQty=Math.max(0,cur+delta);
+  setCustCartQty(itemId,newQty);
+  // 同步更新該品項 input 欄位
+  var inp=document.getElementById('qty-'+itemId);
+  if(inp)inp.value=newQty;
+};
+
+window.setCustCartQty=function(itemId,qty){
+  qty=parseFloat(qty)||0;
+  if(qty<=0){
+    delete custCart[itemId];
+  }else{
+    var items=_getCustOrderableItems();
+    var item=items.find(function(x){return x.id===itemId});
+    if(!item)return;
+    var price=_applyDiscount(item.price,custApp.customer);
+    custCart[itemId]={
+      id:item.id,
+      source:item.source,
+      name:item.name,
+      unit:item.unit,
+      qty:qty,
+      price:price,
+      total:Math.round(price*qty*100)/100
+    };
+  }
+  updateCustCartSummary();
+};
+
+function updateCustCartSummary(){
+  var keys=Object.keys(custCart);
+  var summary=document.getElementById('cust-cart-summary');
+  if(!summary)return;
+  if(keys.length===0){
+    summary.style.display='none';
+    return;
+  }
+  var total=keys.reduce(function(s,k){return s+custCart[k].total},0);
+  document.getElementById('cust-cart-count').textContent=keys.length;
+  document.getElementById('cust-cart-total').textContent='$'+total.toLocaleString();
+  summary.style.display='block';
+}
+
+window.clearCustCart=function(){
+  if(Object.keys(custCart).length===0)return;
+  if(!confirm('確定清空購物車?'))return;
+  custCart={};
+  renderCustOrderItems();
+};
+
+window.confirmCustOrder=function(){
+  var cust=custApp.customer;
+  if(!cust)return;
+  var keys=Object.keys(custCart);
+  if(keys.length===0){showToast('請先選擇品項','warning');return}
+  
+  var subtotal=keys.reduce(function(s,k){return s+custCart[k].total},0);
+  var taxRate=0.05;
+  var tax=Math.round(subtotal*taxRate);
+  var total=subtotal+tax;
+  
+  // 風險檢查 - 額度
+  var lim=cust.creditLimit||0;
+  var used=cust.creditUsed||0;
+  if(app.data&&app.data.custOrders){
+    used=app.data.custOrders.filter(function(o){return o.custId===cust.id&&['approved','shipped','invoiced'].indexOf(o.status)>=0}).reduce(function(s,o){return s+(o.total||0)},0);
+  }
+  var avail=Math.max(0,lim-used);
+  if(lim>0&&total>avail){
+    alert('⚠️ 此次訂單金額超過可用額度\n\n本次訂單: $'+total.toLocaleString()+'\n可用額度: $'+avail.toLocaleString()+'\n\n請刪除部分品項或聯繫商家提升額度');
+    return;
+  }
+  
+  // 確認 modal
+  var itemsHtml=keys.map(function(k){
+    var c=custCart[k];
+    return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F1EB;font-size:0.84rem"><div style="flex:1">'+esc(c.name)+' <span style="color:#999;font-size:0.78rem">x'+c.qty+' '+esc(c.unit)+'</span></div><div style="font-weight:700">$'+c.total+'</div></div>';
+  }).join('');
+  
+  var c=document.getElementById('app-content');
+  // 用 inline confirm 而非 prompt(支援 textarea)
+  c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+    '<div class="card" style="padding:18px">'+
+      '<div style="font-size:1.05rem;font-weight:700;margin-bottom:14px">📦 確認訂單</div>'+
+      '<div style="margin-bottom:14px;max-height:280px;overflow-y:auto">'+itemsHtml+'</div>'+
+      '<div style="border-top:1px solid var(--brd);padding-top:10px;margin-bottom:12px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px"><span>未稅小計</span><span>$'+subtotal.toLocaleString()+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px"><span>稅 (5%)</span><span>$'+tax.toLocaleString()+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:700;color:#0A5A46;margin-top:8px"><span>合計</span><span>$'+total.toLocaleString()+'</span></div>'+
+      '</div>'+
+      '<div class="fg" style="margin-bottom:14px"><label style="font-size:0.84rem;color:var(--txt3)">備註 (選填)</label><textarea id="cust-order-note" style="width:100%;padding:8px;border:1px solid var(--brd);border-radius:6px;font-family:inherit;font-size:0.88rem;resize:vertical;min-height:60px" placeholder="例:盡快出貨、配送地址等"></textarea></div>'+
+      '<div style="display:flex;gap:8px"><button class="btn btn-out" onclick="showCustomerOrder()" style="flex:1">← 繼續編輯</button><button class="btn btn-pri" onclick="submitCustOrder()" style="flex:2;font-weight:700">📤 送出訂單</button></div>'+
+    '</div>'+
+    '</div>';
+};
+
+window.submitCustOrder=function(){
+  var cust=custApp.customer;
+  if(!cust)return;
+  var keys=Object.keys(custCart);
+  if(keys.length===0){showToast('購物車為空','warning');return}
+  
+  var note=(document.getElementById('cust-order-note')||{}).value||'';
+  var itemsList=keys.map(function(k){return Object.assign({},custCart[k])});
+  var subtotal=itemsList.reduce(function(s,it){return s+it.total},0);
+  var tax=Math.round(subtotal*0.05);
+  var total=subtotal+tax;
+  
+  var now=new Date();
+  var pad=function(n){return n<10?'0'+n:n};
+  var orderDate=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  
+  var newOrder={
+    id:'CO'+now.getTime(),
+    custId:cust.id,
+    custCode:cust.code,
+    custName:cust.name,
+    items:itemsList,
+    subtotal:subtotal,
+    tax:tax,
+    total:total,
+    status:'pending',
+    orderDate:orderDate,
+    approvedAt:'',approvedBy:'',
+    shippedAt:'',shippedBy:'',
+    invoicedAt:'',invoiceNo:'',
+    paidAt:'',paidBy:'',
+    completedAt:'',
+    notes:note
+  };
+  
+  // 寫入 app.data.custOrders 並 cloudPush
+  showToast('🔄 送出中...');
+  if(!app.data)app.data={};
+  if(!app.data.custOrders)app.data.custOrders=[];
+  app.data.custOrders.push(newOrder);
+  
+  cloudPush();
+  
+  // 清購物車 + 顯示成功頁
+  custCart={};
+  setTimeout(function(){
+    var c=document.getElementById('app-content');
+    c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+      '<div class="card" style="padding:30px;text-align:center;background:linear-gradient(135deg,#E8F4EE,#fff)">'+
+        '<div style="font-size:3rem;margin-bottom:12px">✅</div>'+
+        '<div style="font-size:1.2rem;font-weight:700;color:#0A5A46;margin-bottom:8px">訂單已送出</div>'+
+        '<div style="font-size:0.84rem;color:var(--txt3);margin-bottom:14px">商家收到後會審核並安排出貨</div>'+
+        '<div style="background:#fff;padding:12px;border-radius:8px;margin-bottom:14px;text-align:left">'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:4px"><span style="color:var(--txt3)">訂單編號</span><span style="font-family:monospace;font-weight:700">'+newOrder.id+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:4px"><span style="color:var(--txt3)">總計</span><span style="font-weight:700;color:#0A5A46">$'+total.toLocaleString()+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.84rem"><span style="color:var(--txt3)">狀態</span><span style="background:#FFF3E0;color:#D4950F;padding:1px 8px;border-radius:10px;font-size:0.78rem;font-weight:700">待審核</span></div>'+
+        '</div>'+
+        '<button class="btn btn-pri" onclick="showCustomerOrderHistory()" style="width:100%;margin-bottom:8px">📋 查看我的訂單</button>'+
+        '<button class="btn btn-out" onclick="showCustomerHome()" style="width:100%">← 返回首頁</button>'+
+      '</div>'+
+      '</div>';
+  },800);
+};
+
+// 客戶訂單歷史
+window.showCustomerOrderHistory=function(){
+  document.getElementById('tab-bar').style.display='none';
+  var cust=custApp.customer;
+  if(!cust){showCustomerLogin();return}
+  
+  var orders=(app.data&&app.data.custOrders)?app.data.custOrders.filter(function(o){return o.custId===cust.id}):[];
+  orders=orders.slice().reverse();  // 最新在前
+  
+  var statusLabel={pending:'⏳ 待審核',approved:'✅ 已核准',shipped:'🚚 已出貨',invoiced:'🧾 已開發票',paid:'💰 已付款',completed:'✔ 已完成',cancelled:'❌ 已取消',returned:'↩️ 退貨中',refunded:'💸 已退款'};
+  var statusColor={pending:'#D4950F',approved:'#0A5A46',shipped:'#0A5A46',invoiced:'#0A5A46',paid:'#0A5A46',completed:'#666',cancelled:'#999',returned:'#B82525',refunded:'#999'};
+  
+  var html='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+      '<button class="btn btn-out btn-sm" onclick="showCustomerHome()">←</button>'+
+      '<div style="font-weight:700;font-size:1.05rem">📋 我的訂單</div>'+
+    '</div>';
+  
+  if(orders.length===0){
+    html+='<div class="card" style="padding:40px 16px;text-align:center"><div style="font-size:2.5rem;margin-bottom:10px">📭</div><div style="color:var(--txt3)">尚無訂單記錄</div><button class="btn btn-pri" onclick="showCustomerOrder()" style="margin-top:14px">🛒 立即下單</button></div>';
+  }else{
+    orders.forEach(function(o){
+      var st=o.status||'pending';
+      var clr=statusColor[st]||'#666';
+      var lbl=statusLabel[st]||st;
+      html+='<div class="card" style="padding:14px;margin-bottom:10px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-family:monospace;font-size:0.78rem;color:var(--txt3)">'+esc(o.id)+'</div>'+
+            '<div style="font-size:0.84rem;color:var(--txt3);margin-top:2px">'+esc(o.orderDate||'')+'</div>'+
+          '</div>'+
+          '<span style="background:'+clr+'22;color:'+clr+';padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700">'+lbl+'</span>'+
+        '</div>'+
+        '<div style="font-size:0.84rem;color:#444;margin-bottom:6px">'+(o.items||[]).slice(0,3).map(function(it){return esc(it.name)+' x'+it.qty}).join('、')+(o.items&&o.items.length>3?' 等 '+o.items.length+' 項':'')+'</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:8px;border-top:1px solid var(--brd)">'+
+          '<span style="font-size:0.78rem;color:var(--txt3)">總計</span>'+
+          '<span style="font-size:1.1rem;font-weight:700;color:#0A5A46">$'+(o.total||0).toLocaleString()+'</span>'+
+        '</div>'+
+        (o.notes?'<div style="font-size:0.78rem;color:var(--txt3);margin-top:6px;padding:6px 8px;background:#F3F1EB;border-radius:4px">📝 '+esc(o.notes)+'</div>':'')+
+        // M4: 退貨按鈕(僅 paid/completed 顯示)
+        (['paid','completed'].indexOf(st)>=0?'<button class="btn btn-out btn-sm" onclick="requestReturn(\''+esc(o.id)+'\')" style="margin-top:8px;width:100%;color:#B82525;border-color:#B82525">↩️ 申請退貨</button>':'')+
+        '</div>';
+    });
+  }
+  html+='</div>';
+  document.getElementById('app-content').innerHTML=html;
+};
+
+// M4: 客戶端申請退貨
+window.requestReturn=function(orderId){
+  var o=(app.data&&app.data.custOrders||[]).find(function(x){return x.id===orderId});
+  if(!o){showToast('找不到訂單','error');return}
+  
+  var c=document.getElementById('app-content');
+  var itemsHtml=(o.items||[]).map(function(it,idx){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #F3F1EB">'+
+      '<div style="flex:1;min-width:0"><div style="font-size:0.92rem;font-weight:600">'+esc(it.name)+'</div><div style="font-size:0.78rem;color:var(--txt3)">原訂 '+(it.qty||0)+' '+esc(it.unit||'')+' / $'+(it.price||0)+'</div></div>'+
+      '<input id="ret-qty-'+idx+'" type="number" min="0" max="'+(it.qty||0)+'" step="0.5" value="0" oninput="recalcCustReturn(\''+orderId+'\')" style="width:60px;height:32px;text-align:center;border:1px solid var(--brd);border-radius:6px;font-family:inherit;font-weight:700">'+
+      '</div>';
+  }).join('');
+  
+  c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'+
+      '<button class="btn btn-out btn-sm" onclick="showCustomerOrderHistory()">←</button>'+
+      '<div style="font-weight:700;font-size:1rem">↩️ 申請退貨 — '+esc(orderId)+'</div>'+
+    '</div>'+
+    '<div class="card" style="padding:14px;margin-bottom:10px;background:#FEF2E5">'+
+      '<div style="font-size:0.84rem;color:#B82525">⚠️ 請選擇要退貨的品項與數量</div>'+
+    '</div>'+
+    '<div class="card" style="padding:0">'+itemsHtml+'</div>'+
+    '<div class="card" style="padding:14px;margin-top:10px">'+
+      '<div class="fg" style="margin-bottom:8px"><label style="font-size:0.84rem;font-weight:600">退貨原因</label>'+
+        '<select id="ret-reason" style="width:100%;padding:8px 12px;border:1px solid var(--brd);border-radius:6px;font-family:inherit;margin-top:4px">'+
+          '<option>商品瑕疵</option><option>送錯貨</option><option>商品過期</option><option>包裝破損</option><option>其他</option>'+
+        '</select>'+
+      '</div>'+
+      '<div class="fg"><label style="font-size:0.84rem;font-weight:600">說明 (選填)</label>'+
+        '<textarea id="ret-notes" style="width:100%;padding:8px;border:1px solid var(--brd);border-radius:6px;font-family:inherit;min-height:60px;margin-top:4px" placeholder="退貨詳細說明..."></textarea>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card" style="padding:14px;margin-top:10px;background:#FEF2E5;text-align:right">'+
+      '<div style="font-size:0.84rem">退款合計</div>'+
+      '<div id="ret-total" style="font-size:1.4rem;font-weight:700;color:#B82525">$0</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+      '<button class="btn btn-out" onclick="showCustomerOrderHistory()" style="flex:1">取消</button>'+
+      '<button class="btn btn-pri" onclick="submitCustReturn(\''+orderId+'\')" style="flex:2;background:#B82525">送出退貨申請</button>'+
+    '</div>'+
+    '</div>';
+};
+
+window.recalcCustReturn=function(orderId){
+  var o=(app.data&&app.data.custOrders||[]).find(function(x){return x.id===orderId});
+  if(!o)return;
+  var subtotal=0;
+  (o.items||[]).forEach(function(it,idx){
+    var inp=document.getElementById('ret-qty-'+idx);
+    if(inp){
+      var qty=+inp.value||0;
+      if(qty>(it.qty||0)){inp.value=it.qty;qty=it.qty}
+      subtotal+=Math.round((it.price||0)*qty*100)/100;
+    }
+  });
+  var total=Math.round(subtotal*1.05);
+  var totalEl=document.getElementById('ret-total');
+  if(totalEl)totalEl.textContent='$'+total.toLocaleString();
+};
+
+window.submitCustReturn=function(orderId){
+  var o=(app.data&&app.data.custOrders||[]).find(function(x){return x.id===orderId});
+  if(!o){showToast('找不到訂單','error');return}
+  var cust=custApp.customer;
+  if(!cust)return;
+  
+  var returnItems=[];
+  var subtotal=0;
+  (o.items||[]).forEach(function(it,idx){
+    var inp=document.getElementById('ret-qty-'+idx);
+    if(inp){
+      var qty=+inp.value||0;
+      if(qty>0){
+        var amt=Math.round((it.price||0)*qty*100)/100;
+        returnItems.push({name:it.name,unit:it.unit,qty:qty,origQty:it.qty,price:it.price,total:amt});
+        subtotal+=amt;
+      }
+    }
+  });
+  
+  if(returnItems.length===0){showToast('請至少選擇一個品項','warning');return}
+  
+  var tax=Math.round(subtotal*0.05);
+  var total=subtotal+tax;
+  var reason=(document.getElementById('ret-reason')||{}).value||'其他';
+  var notes=(document.getElementById('ret-notes')||{}).value||'';
+  
+  if(!confirm('確認送出退貨申請?\n\n品項: '+returnItems.length+' 項\n退款合計: $'+total.toLocaleString()+'\n原因: '+reason+'\n\n等待商家審核'))return;
+  
+  // 寫入 app.data.custReturns
+  if(!app.data)app.data={};
+  if(!app.data.custReturns)app.data.custReturns=[];
+  
+  var now=new Date();
+  var pad=function(n){return n<10?'0'+n:n};
+  var nowStr=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  var returnId='CR'+now.getTime();
+  
+  app.data.custReturns.push({
+    id:returnId,
+    origOrderId:o.id,
+    custId:cust.id,
+    custCode:cust.code,
+    custName:cust.name,
+    items:returnItems,
+    subtotal:subtotal,
+    tax:tax,
+    refundAmt:total,
+    reason:reason,
+    needCreditNote:!!o.invoiceNo,
+    creditNoteNo:'',
+    status:'pending',
+    createdAt:nowStr,
+    createdBy:cust.name+'(客戶)',
+    notes:notes
+  });
+  
+  // 訂單狀態改為退貨中
+  o.status='returned';
+  o.returnId=returnId;
+  
+  showToast('🔄 送出中...');
+  cloudPush();
+  
+  setTimeout(function(){
+    var c=document.getElementById('app-content');
+    c.innerHTML='<div style="padding:16px;max-width:600px;margin:0 auto">'+
+      '<div class="card" style="padding:30px;text-align:center;background:linear-gradient(135deg,#FEF2E5,#fff)">'+
+        '<div style="font-size:3rem;margin-bottom:12px">↩️</div>'+
+        '<div style="font-size:1.2rem;font-weight:700;color:#B82525;margin-bottom:8px">退貨申請已送出</div>'+
+        '<div style="font-size:0.84rem;color:var(--txt3);margin-bottom:14px">商家收到後會審核並聯繫您</div>'+
+        '<div style="background:#fff;padding:12px;border-radius:8px;margin-bottom:14px;text-align:left">'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:4px"><span style="color:var(--txt3)">退貨編號</span><span style="font-family:monospace;font-weight:700">'+returnId+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:4px"><span style="color:var(--txt3)">退款金額</span><span style="font-weight:700;color:#B82525">$'+total.toLocaleString()+'</span></div>'+
+        '</div>'+
+        '<button class="btn btn-pri" onclick="showCustomerOrderHistory()" style="width:100%;margin-bottom:8px">📋 返回我的訂單</button>'+
+      '</div>'+
+      '</div>';
+  },800);
+};
+
+function custLogout(){
+  if(!confirm('確定要登出嗎?'))return;
+  clearCustApp();
+  location.href='?customer=1';
+}
+window.custLogout=custLogout;
+
 // ── Init ──
-if(app.store&&app.firebaseUrl){
+if(_isCustomerMode()){
+  // 客戶模式
+  document.getElementById('tab-bar').style.display='none';
+  // 已登入過,自動進入
+  if(custApp.code&&custApp.customer){
+    cloudPull(function(ok){
+      if(ok){
+        // 重新驗證客戶資料(可能管理端已修改)
+        var freshCust=(app.data&&app.data.customers||[]).find(function(x){return x.code===custApp.code});
+        if(freshCust){
+          // 風險再檢查
+          var errs=_checkCustRisk(freshCust);
+          if(errs.length){
+            // 風險不通過 → 重登
+            clearCustApp();
+            showCustomerLogin();
+            setTimeout(function(){showToast(errs[0],'error')},500);
+          }else{
+            custApp.customer=freshCust;
+            saveCustApp();
+            showCustomerHome();
+          }
+        }else{
+          clearCustApp();
+          showCustomerLogin(_getQueryParam('code'));
+        }
+      }else{
+        showCustomerLogin(_getQueryParam('code'));
+      }
+    });
+  }else{
+    // 未登入 — 嘗試從 URL 取代碼預填
+    showCustomerLogin(_getQueryParam('code'));
+  }
+}else if(app.store&&app.firebaseUrl){
   document.getElementById('tab-bar').style.display='';
   updateHeader();
   cloudPull(function(ok){
