@@ -70,7 +70,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <body>
 
 <div class="header">
-  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.6</span></div>
+  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.7</span></div>
   <div class="header-right" id="hdr-right"></div>
 </div>
 
@@ -90,6 +90,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
+// 好洺門市 APP v1.6.7 — 客戶可訂購品項限定(依老闆端 supplyMode/supplyItems 過濾下單清單)
 // 好洺門市 APP v1.6.6 — 修補版（修復 14 項已知問題）
 // 變更紀錄：
 //   v1.6.6 (2026-04-26)
@@ -109,7 +110,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 // ═══════════════════════════════════════════════════════════
 
 // ── State ──
-var APP_VERSION='1.6.6';
+var APP_VERSION='1.6.7';
 var APP_BUILD='20260426-fix14';
 var APP_KEY='hm_app_v1';
 var FIREBASE_CONFIG={
@@ -1082,6 +1083,13 @@ function _getCustOrderableItems(){
       });
     });
   }
+  // 🆕 客戶可訂購品項限定:老闆端 supplyMode==='list' 才過濾(預設 all=全部看得到)
+  try{
+    var _fc=(app.data&&app.data.customers&&cust)?app.data.customers.find(function(x){return x.code===cust.code}):null;
+    var _sm=_fc?_fc.supplyMode:(cust?cust.supplyMode:null);
+    var _si=_fc?_fc.supplyItems:(cust?cust.supplyItems:null);
+    if(_sm==='list'&&Array.isArray(_si)){items=items.filter(function(it){return _si.indexOf(it.id)>=0})}
+  }catch(e){}
   return items;
 }
 
