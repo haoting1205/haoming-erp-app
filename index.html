@@ -70,7 +70,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <body>
 
 <div class="header">
-  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.0</span></div>
+  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.6</span></div>
   <div class="header-right" id="hdr-right"></div>
 </div>
 
@@ -90,9 +90,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
-// 好洺門市 APP v1.6.0 — 修補版（修復 14 項已知問題）
+// 好洺門市 APP v1.6.6 — 修補版（修復 14 項已知問題）
 // 變更紀錄：
-//   v1.6.0 (2026-04-26)
+//   v1.6.6 (2026-04-26)
 //   🔴 修 #1 登出按鈕 escape bug → 改用 doLogout() 函式
 //   🔴 修 #3 cloudPush 多店覆蓋 → 加入 lastSyncToken 衝突檢查
 //   🟡 修 #2 switchTab 加未登入保護
@@ -109,7 +109,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 // ═══════════════════════════════════════════════════════════
 
 // ── State ──
-var APP_VERSION='1.6.0';
+var APP_VERSION='1.6.6';
 var APP_BUILD='20260426-fix14';
 var APP_KEY='hm_app_v1';
 var FIREBASE_CONFIG={
@@ -1068,6 +1068,20 @@ function _getCustOrderableItems(){
       });
     });
   }
+  // D: 自製品(配方,已勾「納入轉售商品池」) — 售價用配方設定,成本由老闆端分析時計算
+  if(app.data&&app.data.recipes){
+    app.data.recipes.filter(function(r){return r.resale===true}).forEach(function(r){
+      items.push({
+        id:r.id,
+        source:'recipe',
+        name:r.name,
+        unit:r.unit||'包',
+        cat:'自製品',
+        price:_tierPrice(r,tier),
+        cost:0
+      });
+    });
+  }
   return items;
 }
 
@@ -1262,7 +1276,7 @@ window.confirmCustOrder=function(){
   if(keys.length===0){showToast('請先選擇品項','warning');return}
   
   var subtotal=keys.reduce(function(s,k){return s+custCart[k].total},0);
-  var taxRate=0.05;
+  var taxRate=(custApp.customer&&custApp.customer.needTax)?0.05:0;
   var tax=Math.round(subtotal*taxRate);
   var total=subtotal+tax;
   
@@ -1292,7 +1306,7 @@ window.confirmCustOrder=function(){
       '<div style="margin-bottom:14px;max-height:280px;overflow-y:auto">'+itemsHtml+'</div>'+
       '<div style="border-top:1px solid var(--brd);padding-top:10px;margin-bottom:12px">'+
         '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px"><span>未稅小計</span><span>$'+subtotal.toLocaleString()+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px"><span>稅 (5%)</span><span>$'+tax.toLocaleString()+'</span></div>'+
+        (tax>0?'<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px"><span>稅 (5%)</span><span>$'+tax.toLocaleString()+'</span></div>':'<div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px;color:var(--txt3)"><span>稅</span><span>未稅</span></div>')+
         '<div style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:700;color:#0A5A46;margin-top:8px"><span>合計</span><span>$'+total.toLocaleString()+'</span></div>'+
       '</div>'+
       '<div class="fg" style="margin-bottom:14px"><label style="font-size:0.84rem;color:var(--txt3)">備註 (選填)</label><textarea id="cust-order-note" style="width:100%;padding:8px;border:1px solid var(--brd);border-radius:6px;font-family:inherit;font-size:0.88rem;resize:vertical;min-height:60px" placeholder="例:盡快出貨、配送地址等"></textarea></div>'+
@@ -1310,7 +1324,8 @@ window.submitCustOrder=function(){
   var note=(document.getElementById('cust-order-note')||{}).value||'';
   var itemsList=keys.map(function(k){return Object.assign({},custCart[k])});
   var subtotal=itemsList.reduce(function(s,it){return s+it.total},0);
-  var tax=Math.round(subtotal*0.05);
+  var _tr=(custApp.customer&&custApp.customer.needTax)?0.05:0;
+  var tax=Math.round(subtotal*_tr);
   var total=subtotal+tax;
   
   var now=new Date();
@@ -1342,7 +1357,19 @@ window.submitCustOrder=function(){
   if(!app.data.custOrders)app.data.custOrders=[];
   app.data.custOrders.push(newOrder);
   
-  cloudPush();
+  // 🔒 只「追加」訂單到雲端(arrayUnion),不整包覆蓋 → 絕不會蓋掉老闆端的價格/客戶設定
+  if(initAppFirebase()&&_appDb){
+    _appDb.collection('erp').doc('state').update({'data.custOrders':firebase.firestore.FieldValue.arrayUnion(newOrder)}).catch(function(e){console.warn('arrayUnion fail, fallback',e);cloudPush();});
+  }else{cloudPush();}
+
+  // 🔔 通知總公司有新訂單(LINE),網址由老闆端設定;fire-and-forget,失敗不影響下單
+  try{
+    if(app.data&&app.data.lineWebhook){
+      var _sum=(newOrder.items||[]).map(function(it){return it.name+' ×'+it.qty}).join('、');
+      var _msg='🛒 新訂單 ｜ '+(newOrder.custName||'')+'\n'+_sum+'\n合計 NT$'+(newOrder.total||0);
+      fetch(app.data.lineWebhook,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({text:_msg})});
+    }
+  }catch(e){}
   
   // 清購物車 + 顯示成功頁
   custCart={};
@@ -1404,6 +1431,7 @@ window.showCustomerOrderHistory=function(){
           '<span style="font-size:1.1rem;font-weight:700;color:#0A5A46">$'+(o.total||0).toLocaleString()+'</span>'+
         '</div>'+
         (o.notes?'<div style="font-size:0.78rem;color:var(--txt3);margin-top:6px;padding:6px 8px;background:#F3F1EB;border-radius:4px">📝 '+esc(o.notes)+'</div>':'')+
+        (st==='pending'?'<button class="btn btn-out btn-sm" onclick="cancelCustOrder(\''+esc(o.id)+'\')" style="margin-top:8px;width:100%;color:#B82525;border-color:#B82525">✕ 取消訂單（重下）</button>':'')+
         // M4: 退貨按鈕(僅 paid/completed 顯示)
         (['paid','completed'].indexOf(st)>=0?'<button class="btn btn-out btn-sm" onclick="requestReturn(\''+esc(o.id)+'\')" style="margin-top:8px;width:100%;color:#B82525;border-color:#B82525">↩️ 申請退貨</button>':'')+
         '</div>';
@@ -1411,6 +1439,23 @@ window.showCustomerOrderHistory=function(){
   }
   html+='</div>';
   document.getElementById('app-content').innerHTML=html;
+};
+
+// 客戶取消待審核訂單(取消後可重下)
+window.cancelCustOrder=function(orderId){
+  var o=(app.data&&app.data.custOrders||[]).find(function(x){return x.id===orderId});
+  if(!o){showToast('找不到訂單','error');return}
+  if(o.status!=='pending'){showToast('訂單已進入處理,無法自行取消,請聯繫商家','error');return}
+  if(!confirm('確定取消訂單 '+o.id+'？\n\n取消後可重新下正確的單。'))return;
+  if(initAppFirebase()&&_appDb){
+    _appDb.collection('erp').doc('state').update({'data.custOrders':firebase.firestore.FieldValue.arrayRemove(o)}).then(function(){
+      app.data.custOrders=app.data.custOrders.filter(function(x){return x.id!==orderId});
+      showToast('✅ 訂單已取消,可重新下單');showCustomerOrderHistory();
+    }).catch(function(){showToast('取消失敗,請聯繫商家','error')});
+  }else{
+    o.status='cancelled';o.cancelDate=new Date().toISOString();cloudPush();
+    showToast('✅ 訂單已取消,可重新下單');showCustomerOrderHistory();
+  }
 };
 
 // M4: 客戶端申請退貨
@@ -1565,6 +1610,9 @@ window.custLogout=custLogout;
 if(_isCustomerMode()){
   // 客戶模式
   document.getElementById('tab-bar').style.display='none';
+  // 🔧 連結指定的客戶代碼若與目前登入的不同 → 改用連結的客戶(避免同台手機開不同客戶連結卻顯示舊客戶)
+  var _urlCode=_getQueryParam('code');
+  if(_urlCode&&/^\d{3}$/.test(_urlCode)&&custApp.code&&custApp.code!==_urlCode){clearCustApp()}
   // 已登入過,自動進入
   if(custApp.code&&custApp.customer){
     cloudPull(function(ok){
