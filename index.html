@@ -70,7 +70,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <body>
 
 <div class="header">
-  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.7</span></div>
+  <div class="header-title"><span class="header-dot"></span>好洺門市 APP<span style="font-size:0.65rem;color:rgba(255,255,255,.4);margin-left:6px;font-weight:400">v1.6.8</span></div>
   <div class="header-right" id="hdr-right"></div>
 </div>
 
@@ -90,6 +90,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
+// 好洺門市 APP v1.6.8 — 下單清單依老闆端序號排序連動
 // 好洺門市 APP v1.6.7 — 客戶可訂購品項限定(依老闆端 supplyMode/supplyItems 過濾下單清單)
 // 好洺門市 APP v1.6.6 — 修補版（修復 14 項已知問題）
 // 變更紀錄：
@@ -110,7 +111,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 // ═══════════════════════════════════════════════════════════
 
 // ── State ──
-var APP_VERSION='1.6.7';
+var APP_VERSION='1.6.8';
 var APP_BUILD='20260426-fix14';
 var APP_KEY='hm_app_v1';
 var FIREBASE_CONFIG={
@@ -1051,7 +1052,8 @@ function _getCustOrderableItems(){
         unit:p.unit||'包',
         cat:p.cat||'轉售品項',
         price:_tierPrice(p,tier),
-        cost:+p.cost||0
+        cost:+p.cost||0,
+        sort:+p.sort||0
       });
     });
   }
@@ -1065,7 +1067,8 @@ function _getCustOrderableItems(){
         unit:i.unit||'公斤',
         cat:i.cat||'食材',
         price:_tierPrice(i,tier),
-        cost:+i.price||0
+        cost:+i.price||0,
+        sort:+i.sort||0
       });
     });
   }
@@ -1079,7 +1082,8 @@ function _getCustOrderableItems(){
         unit:r.unit||'包',
         cat:'自製品',
         price:_tierPrice(r,tier),
-        cost:0
+        cost:0,
+        sort:+r.sort||0
       });
     });
   }
@@ -1090,6 +1094,8 @@ function _getCustOrderableItems(){
     var _si=_fc?_fc.supplyItems:(cust?cust.supplyItems:null);
     if(_sm==='list'&&Array.isArray(_si)){items=items.filter(function(it){return _si.indexOf(it.id)>=0})}
   }catch(e){}
+  // 🆕 依老闆端序號排序(小→大,未設序號者排後依名稱);客戶下單頁順序連動轉售品項序號
+  items.sort(function(a,b){var sa=(+a.sort>0)?+a.sort:99999,sb=(+b.sort>0)?+b.sort:99999;if(sa!==sb)return sa-sb;return (a.name||'').localeCompare(b.name||'')});
   return items;
 }
 
